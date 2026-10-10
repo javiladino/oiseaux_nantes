@@ -1,0 +1,68 @@
+version: 2
+
+models:
+  - name: fct_observations
+    description: "Central fact table for Power BI analytical queries. One row per valid bird observation within Greater Nantes, partitioned by year and month. Incremental strategy: insert_overwrite."
+    columns:
+      - name: observation_id
+        description: "Primary key; unique iNaturalist observation identifier."
+        tests:
+          - unique
+          - not_null
+      - name: species_key
+        description: "Foreign key to dim_species."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_species')
+              field: species_key
+      - name: user_key
+        description: "Foreign key to dim_users."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_users')
+              field: user_key
+      - name: date_key
+        description: "Foreign key to dim_date (observation date)."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+      - name: latitude
+        description: "WGS84 latitude of the observation (within Nantes bbox)."
+        tests:
+          - not_null
+      - name: longitude
+        description: "WGS84 longitude of the observation (within Nantes bbox)."
+        tests:
+          - not_null
+      - name: positional_accuracy_m
+        description: "GPS positional accuracy in metres; nullable."
+      - name: quality_grade
+        description: "iNaturalist data quality tier."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [research, needs_id, casual]
+      - name: is_research_grade
+        description: "True when quality_grade is 'research' (FR-007)."
+        tests:
+          - not_null
+      - name: observation_period
+        description: "Local Paris time-of-day bucket: Madrugada, Mañana, Tarde, or Noche (FR-006)."
+        tests:
+          - not_null
+      - name: created_at_utc
+        description: "Original submission timestamp in UTC."
+        tests:
+          - not_null
+      - name: year
+        description: "Partition key — calendar year of observed_on."
+        tests:
+          - not_null
+      - name: month
+        description: "Partition key — calendar month of observed_on."
+        tests:
+          - not_null

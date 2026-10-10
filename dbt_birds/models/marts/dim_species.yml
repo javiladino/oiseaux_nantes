@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: dim_species
+    description: "One row per unique taxon observed within the Nantes bounding box. SCD Type 1 — overwritten on each dbt run."
+    columns:
+      - name: species_key
+        description: "Surrogate primary key; equals taxon_id."
+        tests:
+          - unique
+          - not_null
+      - name: taxon_id
+        description: "iNaturalist taxon identifier."
+        tests:
+          - unique
+          - not_null
+      - name: scientific_name
+        description: "Latin binomial name of the species."
+        tests:
+          - not_null
+      - name: common_name
+        description: "Preferred common name; nullable for uncommon taxa."
+      - name: taxon_rank
+        description: "Taxonomic rank (e.g., species, subspecies, genus)."
+        tests:
+          - not_null
+      - name: is_threatened
+        description: "True when iNaturalist flags the taxon as threatened."
+        tests:
+          - not_null

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.env.*
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# dbt
+dbt_birds/target/
+dbt_birds/dbt_packages/
+dbt_birds/logs/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# AWS / Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/

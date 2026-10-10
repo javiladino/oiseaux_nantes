@@ -1,0 +1,11 @@
+birds_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: athena
+      region_name: eu-west-3
+      database: awsdatacatalog
+      schema: birds_dbt
+      threads: 4
+      s3_staging_dir: "s3://{{ env_var('BIRDS_S3_BUCKET') }}/athena-results/"
+      s3_data_dir: "s3://{{ env_var('BIRDS_S3_BUCKET') }}/processed/"

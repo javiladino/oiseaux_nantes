@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name: raw_inaturalist
+    description: "Raw iNaturalist bird observations ingested by the Lambda pipeline"
+    database: awsdatacatalog
+    schema: birds_raw
+    tables:
+      - name: observations
+        description: "Raw NDJSON observations partitioned by year and month"
+        external:
+          location: "s3://{{ env_var('BIRDS_S3_BUCKET') }}/raw/inaturalist/observations/"
+          row_format: >
+            SERDE 'org.openx.data.jsonserde.JsonSerDe'
+          partitions:
+            - name: year
+              data_type: string
+            - name: month
+              data_type: string

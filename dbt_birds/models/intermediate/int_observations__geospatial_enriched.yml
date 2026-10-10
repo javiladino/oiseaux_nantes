@@ -1,0 +1,85 @@
+version: 2
+
+models:
+  - name: int_observations__geospatial_enriched
+    description: "Observations filtered to the Greater Nantes bounding box with spatial flags, time-of-day period classification, and research-grade flag applied."
+    columns:
+      - name: observation_id
+        description: "Unique observation identifier (from staging)."
+        tests:
+          - unique
+          - not_null
+      - name: created_at_utc
+        description: "Submission timestamp in UTC."
+        tests:
+          - not_null
+      - name: observed_on
+        description: "Calendar date of observation."
+        tests:
+          - not_null
+      - name: latitude
+        description: "WGS84 latitude; guaranteed within Nantes bbox."
+        tests:
+          - not_null
+      - name: longitude
+        description: "WGS84 longitude; guaranteed within Nantes bbox."
+        tests:
+          - not_null
+      - name: positional_accuracy_m
+        description: "GPS positional accuracy in metres; nullable."
+      - name: quality_grade
+        description: "iNaturalist data quality tier."
+        tests:
+          - accepted_values:
+              values: [research, needs_id, casual]
+      - name: is_research_grade
+        description: "True when quality_grade is 'research' (FR-007)."
+        tests:
+          - not_null
+      - name: observation_period
+        description: "Local Paris time-of-day bucket (FR-006)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [Madrugada, "Mañana", Tarde, Noche]
+          - dbt_utils.expression_is_true:
+              expression: "observation_period IN ('Madrugada', 'Mañana', 'Tarde', 'Noche')"
+      - name: taxon_id
+        description: "iNaturalist taxon identifier."
+        tests:
+          - not_null
+      - name: taxon_scientific_name
+        description: "Latin binomial name."
+        tests:
+          - not_null
+      - name: taxon_common_name
+        description: "Preferred common name; nullable."
+      - name: taxon_rank
+        description: "Taxonomic rank."
+        tests:
+          - not_null
+      - name: taxon_threatened
+        description: "iNaturalist threatened flag."
+        tests:
+          - not_null
+      - name: user_id
+        description: "iNaturalist user identifier."
+        tests:
+          - not_null
+      - name: user_login
+        description: "iNaturalist username."
+        tests:
+          - not_null
+      - name: user_display_name
+        description: "Full display name; nullable."
+      - name: observed_year
+        description: "Calendar year of observed_on for fact table partitioning."
+        tests:
+          - not_null
+      - name: observed_month
+        description: "Calendar month of observed_on for fact table partitioning."
+        tests:
+          - not_null
+
+    tests:
+      - assert_observations_within_nantes_bbox

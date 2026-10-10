@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: dim_users
+    description: "One row per unique citizen scientist observer. SCD Type 1."
+    columns:
+      - name: user_key
+        description: "Surrogate primary key; equals user_id."
+        tests:
+          - unique
+          - not_null
+      - name: user_id
+        description: "iNaturalist user identifier."
+        tests:
+          - unique
+          - not_null
+      - name: login
+        description: "iNaturalist username (login handle)."
+        tests:
+          - not_null
+      - name: display_name
+        description: "Full display name of the observer; nullable."

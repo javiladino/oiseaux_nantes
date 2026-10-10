@@ -1,0 +1,49 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: "Continuous calendar spine covering the full range of observation dates ±30 days, enriched with biological seasonality for the Greater Nantes latitude (FR-011)."
+    columns:
+      - name: date_key
+        description: "Calendar date; primary key."
+        tests:
+          - unique
+          - not_null
+      - name: year
+        description: "Calendar year as integer."
+        tests:
+          - not_null
+      - name: month
+        description: "Month number (1–12)."
+        tests:
+          - not_null
+      - name: month_name
+        description: "Full month name (e.g., January)."
+        tests:
+          - not_null
+      - name: quarter
+        description: "Quarter number (1–4); derived as CEIL(month / 3.0)."
+        tests:
+          - not_null
+      - name: day_of_week
+        description: "ISO day-of-week (1=Monday, 7=Sunday)."
+        tests:
+          - not_null
+      - name: day_name
+        description: "Full day name (e.g., Monday)."
+        tests:
+          - not_null
+      - name: week_of_year
+        description: "ISO week number within the year."
+        tests:
+          - not_null
+      - name: is_weekend
+        description: "True when day_of_week is Saturday (6) or Sunday (7)."
+        tests:
+          - not_null
+      - name: biological_season
+        description: "Northern Hemisphere biological season for the Nantes latitude (FR-011)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [Primavera, Verano, "Otoño", Invierno]

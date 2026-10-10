@@ -1,0 +1,70 @@
+version: 2
+
+models:
+  - name: stg_inaturalist__observations
+    description: "1:1 mapping of the raw iNaturalist source with types cast, columns renamed to snake_case, nested JSON flattened, and duplicates removed on observation_id."
+    columns:
+      - name: observation_id
+        description: "Unique iNaturalist observation identifier (cast from raw id)."
+        tests:
+          - unique
+          - not_null
+      - name: created_at_utc
+        description: "ISO 8601 submission timestamp normalized to UTC."
+        tests:
+          - not_null
+      - name: observed_on
+        description: "Calendar date when the observation was made (YYYY-MM-DD)."
+        tests:
+          - not_null
+      - name: latitude
+        description: "WGS84 latitude extracted from the 'lat,lng' location string."
+        tests:
+          - not_null
+      - name: longitude
+        description: "WGS84 longitude extracted from the 'lat,lng' location string."
+        tests:
+          - not_null
+      - name: positional_accuracy_m
+        description: "GPS positional accuracy in metres; nullable."
+      - name: quality_grade
+        description: "iNaturalist data quality tier."
+        tests:
+          - accepted_values:
+              values: [research, needs_id, casual]
+      - name: taxon_id
+        description: "iNaturalist taxon identifier flattened from nested taxon object."
+        tests:
+          - not_null
+      - name: taxon_scientific_name
+        description: "Latin binomial name of the taxon."
+        tests:
+          - not_null
+      - name: taxon_common_name
+        description: "Preferred common name; nullable for uncommon taxa."
+      - name: taxon_rank
+        description: "Taxonomic rank (e.g., species, subspecies, genus)."
+        tests:
+          - not_null
+      - name: taxon_threatened
+        description: "Whether iNaturalist flags the taxon as threatened."
+        tests:
+          - not_null
+      - name: user_id
+        description: "iNaturalist user identifier flattened from nested user object."
+        tests:
+          - not_null
+      - name: user_login
+        description: "iNaturalist username (login handle)."
+        tests:
+          - not_null
+      - name: user_display_name
+        description: "Full display name of the observer; nullable."
+      - name: _ingested_year
+        description: "Hive partition year passed through from the raw source."
+        tests:
+          - not_null
+      - name: _ingested_month
+        description: "Hive partition month passed through from the raw source."
+        tests:
+          - not_null
