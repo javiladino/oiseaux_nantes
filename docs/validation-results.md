@@ -1,11 +1,23 @@
 # Validation Results — Nantes Birds Pipeline
 
-**Date**: Pending end-to-end execution against live AWS environment  
 **Reference**: `specs/001-nantes-birds-pipeline/quickstart.md`
 
 ---
 
-## Status Summary
+## Unit Test Results (No Live AWS Required)
+
+Executed via `PYTHONPATH=ingestion pytest tests/unit/ -v`:
+
+| Module | Tests | Result |
+|--------|-------|--------|
+| `test_inaturalist_client.py` | 6 | ✅ PASS |
+| `test_s3_writer.py` | 4 | ✅ PASS |
+| `test_ssm_watermark.py` | 4 | ✅ PASS |
+| **Total** | **14** | **✅ 14/14 PASS** |
+
+---
+
+## End-to-End Scenario Status (Requires Live AWS)
 
 | Scenario | Description | Status | Notes |
 |----------|-------------|--------|-------|
@@ -19,15 +31,17 @@
 
 ---
 
-## How to Run Validation
+## How to Run End-to-End Validation
 
 See `specs/001-nantes-birds-pipeline/quickstart.md` for step-by-step commands for each scenario.
 
 Prerequisites:
 - AWS CLI configured for `eu-west-3`
-- Lambda `birds-inaturalist-ingestion` deployed
-- S3 bucket with `BIRDS_S3_BUCKET` env var set
+- Lambda `birds-inaturalist-ingestion` deployed with env var `BIRDS_S3_BUCKET`
+- S3 bucket with `raw/inaturalist/` prefix
+- SSM parameter `/birds-pipeline/last_successful_run_date` (absent = first run)
 - Athena workgroup + Glue databases (`birds_raw`, `birds_dbt`) created
 - dbt project installed: `pip install dbt-athena-community && cd dbt_birds && dbt deps`
+- For Scenario 6: Power BI Desktop with Amazon Athena ODBC driver
 
-Update this file with pass/fail results as each scenario is validated.
+Update the table above with pass/fail results as each scenario is validated against the live environment.

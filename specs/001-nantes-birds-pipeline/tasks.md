@@ -237,3 +237,11 @@ With multiple developers after Phase 2 is complete:
 - `dbt-external-tables` registration (`dbt run-operation stage_external_sources`) is a one-time step after raw data exists in S3 — document in quickstart.md
 - Lambda IAM role must be scoped to `s3:PutObject` on target prefix only + `ssm:GetParameter`/`ssm:PutParameter` on the single watermark ARN — no wildcard ARNs (constitution IV)
 - All mart models must carry `format='parquet'` + `write_compression='snappy'` for cost governance (constitution IV)
+
+---
+
+## Phase 7: Convergence
+
+- [X] T042 Move `dbt_birds/.github/workflows/dbt_ci.yml` to `.github/workflows/dbt_ci.yml` at the repository root so GitHub Actions can discover and execute it per FR-016 (missing)
+- [ ] T043 Create `reports/nantes_birds.pbix` using Power BI Desktop: connect to Athena ODBC DSN (`birds_dbt` schema), import 4 mart tables, configure star-schema relationships, add geospatial map, seasonal trend, and ranking visuals with DAX measures, then commit the binary per US3/AC1-4, FR-012, FR-013 (missing)
+- [ ] T044 Execute all 7 quickstart.md validation scenarios against the live AWS environment and update `docs/validation-results.md` with actual pass/fail results per T040, SC-004, SC-006 (partial)
