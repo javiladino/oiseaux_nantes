@@ -48,7 +48,9 @@ def _dagbag_class():
 def dagbag():
     if not MANIFEST.exists():
         pytest.fail(f"Falta {MANIFEST}: ejecutar `dbt parse --target ci` antes de los tests")
-    return _dagbag_class()(dag_folder=str(DAGS_DIR), include_examples=False)
+    # Los DAGs de ejemplo ya están excluidos por AIRFLOW__CORE__LOAD_EXAMPLES=False
+    # (en Airflow 3.3 DagBag no acepta include_examples).
+    return _dagbag_class()(dag_folder=str(DAGS_DIR))
 
 
 @pytest.fixture(scope="session")
