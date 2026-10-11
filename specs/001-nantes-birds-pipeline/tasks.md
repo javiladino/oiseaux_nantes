@@ -234,7 +234,7 @@ Con varios desarrolladores, una vez completada la Phase 2:
 - La etiqueta **[Story]** permite trazar cada tarea hasta los criterios de aceptación de spec.md
 - El watermark **nunca** debe actualizarse ante un fallo parcial en S3 (constitución IV + FR-002)
 - El primer `dbt run` de `fct_observations` requiere `--full-refresh` (insert_overwrite necesita crear las particiones)
-- El registro con `dbt-external-tables` (`dbt run-operation stage_external_sources`) es un paso único, una vez existan datos raw en S3 — documentado en quickstart.md
+- ~~El registro con `dbt-external-tables` (`dbt run-operation stage_external_sources`) es un paso único~~ — **Corregido (2026-10-11):** el paquete no soporta Athena; la tabla raw se crea con `dbt run-operation create_raw_observations_table` (partition projection), que `orchestration/deploy/deploy.sh` ejecuta en cada despliegue
 - El rol IAM de Lambda debe limitarse a `s3:PutObject` sobre el prefijo destino + `ssm:GetParameter`/`ssm:PutParameter` sobre el ARN único del watermark — sin ARNs comodín (constitución IV)
 - Todos los modelos de marts deben llevar `format='parquet'` + `write_compression='snappy'` por gobierno de costes (constitución IV)
 

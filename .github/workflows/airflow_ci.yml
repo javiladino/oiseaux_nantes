@@ -12,7 +12,7 @@ jobs:
   dag-integrity:
     runs-on: ubuntu-latest
     env:
-      # sources.yml exige esta variable; dbt parse no se conecta a AWS.
+      # Valor ficticio para cualquier env_var('BIRDS_S3_BUCKET'); dbt parse no se conecta a AWS.
       BIRDS_S3_BUCKET: ci-placeholder
       AIRFLOW_CONSTRAINTS: https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
     steps:
