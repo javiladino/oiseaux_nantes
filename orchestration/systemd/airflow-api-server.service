@@ -1,0 +1,16 @@
+[Unit]
+Description=Airflow API server (UI + Task Execution API)
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+User=airflow
+Group=airflow
+EnvironmentFile=/etc/airflow/airflow.env
+ExecStart=/opt/airflow-venv/bin/airflow api-server
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

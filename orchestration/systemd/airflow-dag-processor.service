@@ -1,0 +1,16 @@
+[Unit]
+Description=Airflow DAG processor
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+User=airflow
+Group=airflow
+EnvironmentFile=/etc/airflow/airflow.env
+ExecStart=/opt/airflow-venv/bin/airflow dag-processor
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

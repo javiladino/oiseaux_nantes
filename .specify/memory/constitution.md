@@ -1,28 +1,28 @@
 <!--
 ## Sync Impact Report
-Generado: 2026-10-10
+Generado: 2026-10-11
 ---
-Cambio de versión: [sin versión / plantilla vacía] → 1.0.0 (MAJOR — ratificación inicial)
+Cambio de versión: 1.0.0 → 1.1.0 (MINOR — nueva herramienta en el stack y ampliación de principios)
 
-Secciones añadidas:
-  - Visión y Propósito del Proyecto (preámbulo, antes de los Principios Fundamentales)
-  - Principios Fundamentales (5 principios — todos nuevos):
-      I.   Separación de Responsabilidades ELT
-      II.  Ingesta Ética de la API y Rate Limiting
-      III. Calidad de Datos con Cero Fallos (NO NEGOCIABLE)
-      IV.  Seguridad de Mínimo Privilegio y Gobierno de Costes
-      V.   Idempotencia y Documentación
-  - Stack Tecnológico y Roles (Sección 2 — nueva)
-  - Estándares de Modelado Medallón en dbt (Sección 3 — nueva)
-  - Gobernanza (nueva)
+Motivo: feature 002-airflow-orchestration (Apache Airflow como orquestador en EC2).
 
-Principios modificados: N/A (ratificación inicial)
+Principios modificados:
+  - I.  Separación de Responsabilidades ELT: añadida la capa de Orquestación (Airflow no
+        extrae ni transforma datos).
+  - IV. Seguridad de Mínimo Privilegio y Gobierno de Costes: añadidas las reglas del rol del
+        orquestador, la excepción de AmazonSSMManagedInstanceCore y la aclaración sobre
+        comodines de sufijo dentro de un recurso concreto.
+
+Secciones modificadas:
+  - Stack Tecnológico y Roles: fila "Programador" actualizada (EventBridge desactivado) y nueva
+    fila "Orquestación".
+
+Secciones añadidas: N/A
 Secciones eliminadas: N/A
 
-TODOs aplazados:
-  - RATIFICATION_DATE fijada en 2026-10-10 (hoy). Actualizar si el proyecto empezó antes.
+Plantillas revisadas: .specify/templates/* no requieren cambios (no dependen del stack).
 
-Este comentario es material de trabajo para revisión humana. Eliminar antes de hacer commit.
+TODOs aplazados: ninguno.
 -->
 
 # Constitución del Pipeline Analítico de Biodiversidad en Nantes
@@ -50,6 +50,10 @@ particionarse temporalmente (`raw/dataset/year=YYYY/month=MM/`).
 
 **Transformación (T):** Todas las transformaciones analíticas DEBEN ejecutarse con dbt mediante
 SQL in-place sobre AWS Athena. Sin procesamiento fila a fila en Lambda.
+
+**Orquestación:** Apache Airflow coordina el orden, los reintentos y las alertas de las etapas.
+El orquestador NO DEBE extraer, cargar ni transformar datos por sí mismo: solo invoca la Lambda
+de ingesta y ejecuta dbt, y NO DEBE leer ni escribir el watermark de ingesta.
 
 **Serving y BI:** Power BI DEBE consumir únicamente data marts modelados y curados (`marts/`).
 Queda prohibido el acceso directo a las capas raw o de staging.
@@ -90,7 +94,13 @@ datos fiables. Una corrupción silenciosa de datos es peor que un fallo visible 
 ### IV. Seguridad de Mínimo Privilegio y Gobierno de Costes
 
 **IAM:** Los roles de ejecución de Lambda DEBEN tener solo `s3:PutObject` sobre el prefijo S3
-destino y permisos de escritura en CloudWatch Logs. No se permiten ARNs de recurso comodín.
+destino y permisos de escritura en CloudWatch Logs. El rol del orquestador DEBE limitarse a
+invocar la Lambda de ingesta, a Athena, Glue y S3 sobre los recursos del proyecto y a publicar
+en el topic de alertas. No se permiten ARNs de recurso comodín. Un comodín de sufijo dentro de
+un recurso concreto (p. ej. `raw/inaturalist/observations/*` o `table/birds_dbt/*`) no se
+considera ARN comodín. Única excepción: la política gestionada `AmazonSSMManagedInstanceCore`,
+necesaria para acceder al orquestador sin abrir puertos, cuyas acciones no admiten permisos por
+recurso.
 
 **Lambda:** El timeout de la función DEBE limitarse a 3 minutos.
 
@@ -121,7 +131,8 @@ implementación de referencia.*
 | Capa | Tecnología | Función Principal |
 | :--- | :--- | :--- |
 | **Motor de Ingesta** | AWS Lambda (Python 3.11+) | Consumidor incremental serverless de la API |
-| **Programador** | Amazon EventBridge | Orquestación cron de la ingesta periódica |
+| **Programador** | Apache Airflow 3.3 (EC2) | Programación diaria de ingesta y transformación; la regla de EventBridge queda desactivada |
+| **Orquestación** | Apache Airflow 3.3 + Astronomer Cosmos | DAG diario, dependencias, reintentos, alertas |
 | **Almacenamiento / Lake** | AWS S3 | Zona raw (JSON) y zona procesada (Parquet) |
 | **Catálogo y Esquema** | AWS Glue Data Catalog | Crawler de metadatos y definiciones de tablas |
 | **Motor de Cómputo** | AWS Athena | Motor SQL distribuido serverless |
@@ -184,4 +195,4 @@ conflicto entre este documento y cualquier otra directriz, prevalece este docume
 constitución antes del merge. Cualquier complejidad añadida más allá de lo que requiere un
 feature DEBE justificarse explícitamente frente a los principios anteriores.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-10 | **Last Amended**: 2026-10-10
+**Version**: 1.1.0 | **Ratified**: 2026-10-10 | **Last Amended**: 2026-10-11
