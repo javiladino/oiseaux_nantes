@@ -55,6 +55,7 @@ def dagbag():
 
 @pytest.fixture(scope="session")
 def dag(dagbag):
-    loaded = dagbag.get_dag(DAG_ID)
+    # dagbag.get_dag() consulta la base de metadatos en Airflow 3; aquí basta con lo parseado.
+    loaded = dagbag.dags.get(DAG_ID)
     assert loaded is not None, f"El DAG {DAG_ID} no se cargó: {dagbag.import_errors}"
     return loaded
