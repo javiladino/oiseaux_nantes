@@ -1,8 +1,8 @@
-# Data Model: Nantes Birds Biodiversity Pipeline
+# Modelo de Datos: Pipeline de Biodiversidad de Aves en Nantes
 
-**Feature**: `001-nantes-birds-pipeline` | **Date**: 2026-10-10
+**Feature**: `001-nantes-birds-pipeline` | **Fecha**: 2026-10-10
 
-## Architecture Overview
+## Visión General de la Arquitectura
 
 ```
 S3 (raw JSON, partitioned year/month)
@@ -20,59 +20,60 @@ S3 (raw JSON, partitioned year/month)
   dim_users (DIM)                           dim_date (DIM)
 ```
 
-Star schema in `marts/` layer consumed by Power BI. Power BI MUST NOT access staging or
-intermediate layers directly.
+El esquema estrella de la capa `marts/` es consumido por Power BI. Power BI NO DEBE acceder
+directamente a las capas de staging ni intermedia.
 
 ---
 
-## Raw Source
+## Fuente Raw
 
-### `raw_inaturalist.observations` (External Athena Table)
+### `raw_inaturalist.observations` (Tabla Externa de Athena)
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `raw_json` | STRING | Full JSON response object per observation, stored as-is |
-| `year` | STRING | Hive partition key derived from `created_at` |
-| `month` | STRING | Hive partition key derived from `created_at` |
+| Columna | Tipo | Notas |
+|---------|------|-------|
+| `raw_json` | STRING | Objeto JSON completo de la respuesta por observación, guardado tal cual |
+| `year` | STRING | Clave de partición Hive derivada de `created_at` |
+| `month` | STRING | Clave de partición Hive derivada de `created_at` |
 
-- **Format**: One JSON object per line (NDJSON) per S3 file
-- **S3 Path**: `s3://{bucket}/raw/inaturalist/observations/year={YYYY}/month={MM}/`
+- **Formato**: Un objeto JSON por línea (NDJSON) en cada archivo de S3
+- **Ruta S3**: `s3://{bucket}/raw/inaturalist/observations/year={YYYY}/month={MM}/`
 - **SerDe**: `org.openx.data.jsonserde.JsonSerDe`
-- **Managed by**: Lambda ingestion; DDL registered via `dbt-external-tables`
-- **Schema drift**: Tolerated at this layer; new fields are ignored by downstream models
+- **Gestionada por**: Ingesta en Lambda; DDL registrado mediante `dbt-external-tables`
+- **Schema drift**: Tolerado en esta capa; los campos nuevos son ignorados por los modelos posteriores
 
 ---
 
-## Staging Layer
+## Capa de Staging
 
 ### `stg_inaturalist__observations`
 
-**Purpose**: 1:1 mapping of the raw source. Cast types, rename to snake_case, flatten nested
-JSON structures, preliminary dedup on `observation_id`. No business logic.
+**Propósito**: Mapeo 1:1 de la fuente raw. Castea tipos, renombra a snake_case, aplana las
+estructuras JSON anidadas y hace una deduplicación preliminar por `observation_id`. Sin lógica
+de negocio.
 
-**Materialization**: `view` (no storage cost; always reflects current raw data)
+**Materialización**: `view` (sin coste de almacenamiento; siempre refleja los datos raw actuales)
 
-| Column | Type | Source | Transformation |
-|--------|------|--------|----------------|
-| `observation_id` | BIGINT | `id` | Cast to BIGINT; PK |
-| `created_at_utc` | TIMESTAMP | `created_at` | Parse ISO 8601; normalize to UTC |
-| `observed_on` | DATE | `observed_on` | Parse `YYYY-MM-DD` |
-| `latitude` | DOUBLE | `location` | Split `"lat,lng"` string on `,`; index 0 |
-| `longitude` | DOUBLE | `location` | Split `"lat,lng"` string on `,`; index 1 |
-| `positional_accuracy_m` | INT | `positional_accuracy` | Direct cast; nullable |
-| `quality_grade` | VARCHAR | `quality_grade` | Direct; validated in tests |
-| `taxon_id` | BIGINT | `taxon.id` | Flatten nested object |
-| `taxon_scientific_name` | VARCHAR | `taxon.name` | Flatten |
-| `taxon_common_name` | VARCHAR | `taxon.preferred_common_name` | Flatten; nullable |
-| `taxon_rank` | VARCHAR | `taxon.rank` | Flatten |
-| `taxon_threatened` | BOOLEAN | `taxon.threatened` | Flatten |
-| `user_id` | BIGINT | `user.id` | Flatten nested object |
-| `user_login` | VARCHAR | `user.login` | Flatten |
-| `user_display_name` | VARCHAR | `user.name` | Flatten; nullable |
-| `_ingested_year` | STRING | partition `year` | Pass-through for downstream partitioning |
-| `_ingested_month` | STRING | partition `month` | Pass-through for downstream partitioning |
+| Columna | Tipo | Origen | Transformación |
+|---------|------|--------|----------------|
+| `observation_id` | BIGINT | `id` | Cast a BIGINT; PK |
+| `created_at_utc` | TIMESTAMP | `created_at` | Parseo ISO 8601; normalizado a UTC |
+| `observed_on` | DATE | `observed_on` | Parseo `YYYY-MM-DD` |
+| `latitude` | DOUBLE | `location` | Separar la cadena `"lat,lng"` por `,`; índice 0 |
+| `longitude` | DOUBLE | `location` | Separar la cadena `"lat,lng"` por `,`; índice 1 |
+| `positional_accuracy_m` | INT | `positional_accuracy` | Cast directo; admite nulos |
+| `quality_grade` | VARCHAR | `quality_grade` | Directo; validado en tests |
+| `taxon_id` | BIGINT | `taxon.id` | Aplanar objeto anidado |
+| `taxon_scientific_name` | VARCHAR | `taxon.name` | Aplanar |
+| `taxon_common_name` | VARCHAR | `taxon.preferred_common_name` | Aplanar; admite nulos |
+| `taxon_rank` | VARCHAR | `taxon.rank` | Aplanar |
+| `taxon_threatened` | BOOLEAN | `taxon.threatened` | Aplanar |
+| `user_id` | BIGINT | `user.id` | Aplanar objeto anidado |
+| `user_login` | VARCHAR | `user.login` | Aplanar |
+| `user_display_name` | VARCHAR | `user.name` | Aplanar; admite nulos |
+| `_ingested_year` | STRING | partición `year` | Se propaga para el particionado posterior |
+| `_ingested_month` | STRING | partición `month` | Se propaga para el particionado posterior |
 
-**dbt tests**:
+**Tests dbt**:
 - `observation_id`: `unique`, `not_null`
 - `quality_grade`: `accepted_values: [research, needs_id, casual]`
 - `latitude`: `not_null`
@@ -80,101 +81,101 @@ JSON structures, preliminary dedup on `observation_id`. No business logic.
 - `taxon_id`: `not_null`
 - `user_id`: `not_null`
 
-**Dedup logic**: `ROW_NUMBER() OVER (PARTITION BY observation_id ORDER BY created_at_utc DESC) = 1`
+**Lógica de deduplicación**: `ROW_NUMBER() OVER (PARTITION BY observation_id ORDER BY created_at_utc DESC) = 1`
 
 ---
 
-## Intermediate Layer
+## Capa Intermedia
 
 ### `int_observations__geospatial_enriched`
 
-**Purpose**: Business logic layer. Applies spatial validation (Greater Nantes bounding box),
-time-of-day classification, and research-grade flag. No staging model references permitted
-in marts.
+**Propósito**: Capa de lógica de negocio. Aplica la validación espacial (bounding box del Gran
+Nantes), la clasificación por franja horaria y la bandera de grado de investigación. No se
+permite que los marts referencien modelos de staging.
 
-**Materialization**: `view`
+**Materialización**: `view`
 
-**Inputs**: `stg_inaturalist__observations`
+**Entradas**: `stg_inaturalist__observations`
 
-**Bounding box filter** (FR-005):
+**Filtro de bounding box** (FR-005):
 ```
 swlat = 46.8600781, swlng = -2.6257395
 nelat = 47.8359431, nelng = -0.9466615
 ```
-Records outside this box are excluded (silent discard — not an error per spec assumptions).
-Records **exactly on the boundary** are included (`>=`/`<=` comparison).
+Los registros fuera de esta caja se excluyen (descarte silencioso — no es un error según los
+supuestos de la spec). Los registros **exactamente en el límite** se incluyen (comparación `>=`/`<=`).
 
-| Column | Type | Source | Transformation |
-|--------|------|--------|----------------|
-| `observation_id` | BIGINT | staging | Pass-through |
-| `created_at_utc` | TIMESTAMP | staging | Pass-through |
-| `observed_on` | DATE | staging | Pass-through |
-| `latitude` | DOUBLE | staging | Pass-through (already validated in bbox filter) |
-| `longitude` | DOUBLE | staging | Pass-through |
-| `positional_accuracy_m` | INT | staging | Pass-through |
-| `quality_grade` | VARCHAR | staging | Pass-through |
+| Columna | Tipo | Origen | Transformación |
+|---------|------|--------|----------------|
+| `observation_id` | BIGINT | staging | Se propaga |
+| `created_at_utc` | TIMESTAMP | staging | Se propaga |
+| `observed_on` | DATE | staging | Se propaga |
+| `latitude` | DOUBLE | staging | Se propaga (ya validada en el filtro bbox) |
+| `longitude` | DOUBLE | staging | Se propaga |
+| `positional_accuracy_m` | INT | staging | Se propaga |
+| `quality_grade` | VARCHAR | staging | Se propaga |
 | `is_research_grade` | BOOLEAN | `quality_grade` | `quality_grade = 'research'` (FR-007) |
-| `observation_period` | VARCHAR | `created_at_utc` | Hour-based classification (FR-006) |
-| `taxon_id` | BIGINT | staging | Pass-through |
-| `taxon_scientific_name` | VARCHAR | staging | Pass-through |
-| `taxon_common_name` | VARCHAR | staging | Pass-through |
-| `taxon_rank` | VARCHAR | staging | Pass-through |
-| `taxon_threatened` | BOOLEAN | staging | Pass-through |
-| `user_id` | BIGINT | staging | Pass-through |
-| `user_login` | VARCHAR | staging | Pass-through |
-| `user_display_name` | VARCHAR | staging | Pass-through |
-| `observed_year` | INT | `observed_on` | `YEAR(observed_on)` — for fact partitioning |
-| `observed_month` | INT | `observed_on` | `MONTH(observed_on)` — for fact partitioning |
+| `observation_period` | VARCHAR | `created_at_utc` | Clasificación por hora (FR-006) |
+| `taxon_id` | BIGINT | staging | Se propaga |
+| `taxon_scientific_name` | VARCHAR | staging | Se propaga |
+| `taxon_common_name` | VARCHAR | staging | Se propaga |
+| `taxon_rank` | VARCHAR | staging | Se propaga |
+| `taxon_threatened` | BOOLEAN | staging | Se propaga |
+| `user_id` | BIGINT | staging | Se propaga |
+| `user_login` | VARCHAR | staging | Se propaga |
+| `user_display_name` | VARCHAR | staging | Se propaga |
+| `observed_year` | INT | `observed_on` | `YEAR(observed_on)` — para particionar la tabla de hechos |
+| `observed_month` | INT | `observed_on` | `MONTH(observed_on)` — para particionar la tabla de hechos |
 
-**`observation_period` classification** (FR-006):
-| Hour (UTC, local Paris time offset applied in staging) | Period |
-|-------------------------------------------------------|--------|
+**Clasificación de `observation_period`** (FR-006):
+| Hora (local de París, convertida desde UTC) | Período |
+|---------------------------------------------|---------|
 | 00:00 – 05:59 | Madrugada |
 | 06:00 – 11:59 | Mañana |
 | 12:00 – 17:59 | Tarde |
 | 18:00 – 23:59 | Noche |
 
-Note: classification based on local hour (Paris time = UTC+1/+2) — convert `created_at_utc`
-to `Europe/Paris` before bucketing.
+Nota: la clasificación se basa en la hora local (hora de París = UTC+1/+2) — convertir
+`created_at_utc` a `Europe/Paris` antes de asignar la franja.
 
-**dbt tests**:
+**Tests dbt**:
 - `observation_id`: `unique`, `not_null`
 - `is_research_grade`: `not_null`
 - `observation_period`: `accepted_values: [Madrugada, Mañana, Tarde, Noche]`
-- Custom singular test: `assert_observations_within_nantes_bbox.sql`
+- Test singular personalizado: `assert_observations_within_nantes_bbox.sql`
 
 ---
 
-## Marts Layer (Star Schema)
+## Capa de Marts (Esquema Estrella)
 
-### `fct_observations` (Fact Table)
+### `fct_observations` (Tabla de Hechos)
 
-**Purpose**: Central fact table for Power BI analytical queries. One row per valid bird
-observation within Greater Nantes.
+**Propósito**: Tabla de hechos central para las consultas analíticas de Power BI. Una fila por
+observación de ave válida dentro del Gran Nantes.
 
-**Materialization**: `incremental` (`insert_overwrite`, partitioned by `(year, month)`)
+**Materialización**: `incremental` (`insert_overwrite`, particionada por `(year, month)`)
 
-**Grain**: One row per `observation_id`
+**Granularidad**: Una fila por `observation_id`
 
-| Column | Type | FK | Notes |
-|--------|------|----|-------|
-| `observation_id` | BIGINT | — | PK; surrogate key |
+| Columna | Tipo | FK | Notas |
+|---------|------|----|-------|
+| `observation_id` | BIGINT | — | PK; clave sustituta |
 | `species_key` | BIGINT | `dim_species.species_key` | FK |
 | `user_key` | BIGINT | `dim_users.user_key` | FK |
 | `date_key` | DATE | `dim_date.date_key` | FK |
 | `latitude` | DOUBLE | — | WGS84 |
 | `longitude` | DOUBLE | — | WGS84 |
-| `positional_accuracy_m` | INT | — | Nullable |
+| `positional_accuracy_m` | INT | — | Admite nulos |
 | `quality_grade` | VARCHAR | — | `research`/`needs_id`/`casual` |
 | `is_research_grade` | BOOLEAN | — | FR-007 |
 | `observation_period` | VARCHAR | — | FR-006 |
-| `created_at_utc` | TIMESTAMP | — | Original submission time |
-| `year` | INT | — | Partition key |
-| `month` | INT | — | Partition key |
+| `created_at_utc` | TIMESTAMP | — | Momento original de envío |
+| `year` | INT | — | Clave de partición |
+| `month` | INT | — | Clave de partición |
 
-**Incremental filter**: `WHERE observed_on > (SELECT MAX(date_key) FROM {{ this }})`
+**Filtro incremental**: `WHERE observed_on > (SELECT MAX(date_key) FROM {{ this }})`
 
-**dbt tests**:
+**Tests dbt**:
 - `observation_id`: `unique`, `not_null`
 - `species_key`: `not_null`, `relationships` → `dim_species.species_key`
 - `user_key`: `not_null`, `relationships` → `dim_users.user_key`
@@ -184,114 +185,115 @@ observation within Greater Nantes.
 
 ---
 
-### `dim_species` (Species / Taxon Dimension)
+### `dim_species` (Dimensión de Especie / Taxón)
 
-**Purpose**: One row per unique taxon observed. Slowly-changing dimension (SCD Type 1 —
-overwrite on re-run).
+**Propósito**: Una fila por cada taxón único observado. Dimensión lentamente cambiante (SCD
+Tipo 1 — se sobrescribe en cada re-ejecución).
 
-**Materialization**: `table`
+**Materialización**: `table`
 
-**Grain**: One row per `taxon_id`
+**Granularidad**: Una fila por `taxon_id`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `species_key` | BIGINT | PK; surrogate = `taxon_id` |
-| `taxon_id` | BIGINT | iNaturalist taxon ID |
-| `scientific_name` | VARCHAR | Latin binomial |
-| `common_name` | VARCHAR | Nullable (absent for uncommon taxa) |
-| `taxon_rank` | VARCHAR | e.g., `species`, `subspecies`, `genus` |
-| `is_threatened` | BOOLEAN | iNaturalist threatened flag |
+| Columna | Tipo | Notas |
+|---------|------|-------|
+| `species_key` | BIGINT | PK; sustituta = `taxon_id` |
+| `taxon_id` | BIGINT | ID de taxón de iNaturalist |
+| `scientific_name` | VARCHAR | Binomio latino |
+| `common_name` | VARCHAR | Admite nulos (ausente en taxones poco comunes) |
+| `taxon_rank` | VARCHAR | p. ej., `species`, `subspecies`, `genus` |
+| `is_threatened` | BOOLEAN | Bandera de amenaza de iNaturalist |
 
-**dbt tests**:
+**Tests dbt**:
 - `species_key`: `unique`, `not_null`
 - `taxon_id`: `unique`, `not_null`
 - `scientific_name`: `not_null`
 
 ---
 
-### `dim_users` (Observer / User Dimension)
+### `dim_users` (Dimensión de Observador / Usuario)
 
-**Purpose**: One row per unique citizen scientist observer. SCD Type 1.
+**Propósito**: Una fila por cada observador (científico ciudadano) único. SCD Tipo 1.
 
-**Materialization**: `table`
+**Materialización**: `table`
 
-**Grain**: One row per `user_id`
+**Granularidad**: Una fila por `user_id`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `user_key` | BIGINT | PK; surrogate = `user_id` |
-| `user_id` | BIGINT | iNaturalist user ID |
-| `login` | VARCHAR | iNaturalist username |
-| `display_name` | VARCHAR | Full display name; nullable |
+| Columna | Tipo | Notas |
+|---------|------|-------|
+| `user_key` | BIGINT | PK; sustituta = `user_id` |
+| `user_id` | BIGINT | ID de usuario de iNaturalist |
+| `login` | VARCHAR | Nombre de usuario de iNaturalist |
+| `display_name` | VARCHAR | Nombre completo visible; admite nulos |
 
-**dbt tests**:
+**Tests dbt**:
 - `user_key`: `unique`, `not_null`
 - `user_id`: `unique`, `not_null`
 - `login`: `not_null`
 
 ---
 
-### `dim_date` (Calendar Dimension)
+### `dim_date` (Dimensión de Calendario)
 
-**Purpose**: Continuous calendar spine covering the full range of observation dates, enriched
-with biological seasonality. Generated by dbt (no source dependency).
+**Propósito**: Serie de calendario continua que cubre el rango completo de fechas de
+observación, enriquecida con la estacionalidad biológica. Generada por dbt (sin dependencia de
+una fuente).
 
-**Materialization**: `table`
+**Materialización**: `table`
 
-**Grain**: One row per calendar day
+**Granularidad**: Una fila por día de calendario
 
-**Date range**: Derived from `MIN(observed_on)` to `MAX(observed_on)` in
-`int_observations__geospatial_enriched`, extended by ±30 days as buffer (FR-011).
+**Rango de fechas**: Derivado de `MIN(observed_on)` a `MAX(observed_on)` en
+`int_observations__geospatial_enriched`, ampliado ±30 días como margen (FR-011).
 
-| Column | Type | Notes |
-|--------|------|-------|
+| Columna | Tipo | Notas |
+|---------|------|-------|
 | `date_key` | DATE | PK |
-| `year` | INT | Calendar year |
-| `month` | INT | Month number (1–12) |
-| `month_name` | VARCHAR | e.g., `January` |
+| `year` | INT | Año natural |
+| `month` | INT | Número de mes (1–12) |
+| `month_name` | VARCHAR | p. ej., `January` |
 | `quarter` | INT | 1–4 |
-| `day_of_week` | INT | 1 (Mon) – 7 (Sun) ISO |
-| `day_name` | VARCHAR | e.g., `Monday` |
-| `week_of_year` | INT | ISO week number |
+| `day_of_week` | INT | 1 (lun) – 7 (dom) ISO |
+| `day_name` | VARCHAR | p. ej., `Monday` |
+| `week_of_year` | INT | Número de semana ISO |
 | `is_weekend` | BOOLEAN | `day_of_week IN (6, 7)` |
-| `biological_season` | VARCHAR | FR-011; see table below |
+| `biological_season` | VARCHAR | FR-011; ver tabla siguiente |
 
-**Biological season mapping** (Northern Hemisphere, Greater Nantes latitude):
-| Month | Season |
-|-------|--------|
-| March, April, May | Primavera |
-| June, July, August | Verano |
-| September, October, November | Otoño |
-| December, January, February | Invierno |
+**Correspondencia de estaciones biológicas** (hemisferio norte, latitud del Gran Nantes):
+| Mes | Estación |
+|-----|----------|
+| Marzo, abril, mayo | Primavera |
+| Junio, julio, agosto | Verano |
+| Septiembre, octubre, noviembre | Otoño |
+| Diciembre, enero, febrero | Invierno |
 
-**Edge case**: Observations with `observed_on` before `MIN(dim_date.date_key)` — not possible
-if date range is generated after staging is populated. If a backfill introduces earlier dates,
-`dim_date` must be regenerated with `--full-refresh`.
+**Caso límite**: Observaciones con `observed_on` anterior a `MIN(dim_date.date_key)` — no es
+posible si el rango de fechas se genera después de poblar staging. Si un backfill introduce
+fechas anteriores, `dim_date` debe regenerarse con `--full-refresh`.
 
-**dbt tests**:
+**Tests dbt**:
 - `date_key`: `unique`, `not_null`
 - `biological_season`: `accepted_values: [Primavera, Verano, Otoño, Invierno]`
 
 ---
 
-## Entity Relationship Diagram
+## Diagrama Entidad-Relación
 
-```
-fct_observations
-  ├── species_key ──► dim_species.species_key
-  ├── user_key ──────► dim_users.user_key
-  └── date_key ──────► dim_date.date_key
+```mermaid
+erDiagram
+    fct_observations }o--|| dim_species : species_key
+    fct_observations }o--|| dim_users : user_key
+    fct_observations }o--|| dim_date : date_key
 ```
 
 ---
 
-## Validation Rules Summary
+## Resumen de Reglas de Validación
 
-| Rule | Enforced by | Blocks promotion? |
-|------|-------------|-------------------|
-| `observation_id` unique + non-null | dbt `unique` + `not_null` | Yes (SC-004) |
-| All coordinates within Nantes bbox | Custom singular SQL test | Yes |
-| `quality_grade` ∈ {research, needs_id, casual} | `accepted_values` | Yes |
-| FK integrity (fct → all dims) | `relationships` test | Yes |
-| `dim_date` covers all `observed_on` | `relationships` on `date_key` | Yes |
-| `observation_period` ∈ 4 valid values | `accepted_values` | Yes |
+| Regla | Aplicada por | ¿Bloquea la promoción? |
+|-------|--------------|------------------------|
+| `observation_id` único + no nulo | dbt `unique` + `not_null` | Sí (SC-004) |
+| Todas las coordenadas dentro del bbox de Nantes | Test SQL singular personalizado | Sí |
+| `quality_grade` ∈ {research, needs_id, casual} | `accepted_values` | Sí |
+| Integridad de FK (fct → todas las dims) | test `relationships` | Sí |
+| `dim_date` cubre todos los `observed_on` | `relationships` sobre `date_key` | Sí |
+| `observation_period` ∈ 4 valores válidos | `accepted_values` | Sí |

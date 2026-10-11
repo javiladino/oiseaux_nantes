@@ -1,22 +1,22 @@
-# Infrastructure Guide — Nantes Birds Pipeline
+# Guía de Infraestructura — Pipeline de Aves de Nantes
 
-## CloudWatch Alarm (T038 / FR-016)
+## Alarma de CloudWatch (T038 / FR-016)
 
-Create an alarm on the Lambda `birds-inaturalist-ingestion` function to detect errors or timeouts.
+Crear una alarma sobre la función Lambda `birds-inaturalist-ingestion` para detectar errores o timeouts.
 
 ### AWS CLI
 
 ```bash
-# Create SNS topic for pipeline alerts
+# Crear el topic SNS para las alertas del pipeline
 aws sns create-topic --name birds-pipeline-alerts --region eu-west-3
 
-# Subscribe pipeline owner email
+# Suscribir el correo del responsable del pipeline
 aws sns subscribe \
   --topic-arn arn:aws:sns:eu-west-3:<account-id>:birds-pipeline-alerts \
   --protocol email \
   --notification-endpoint <owner-email>
 
-# Alarm: Lambda errors ≥ 1 over 5 minutes
+# Alarma: errores de Lambda ≥ 1 en 5 minutos
 aws cloudwatch put-metric-alarm \
   --alarm-name "birds-ingestion-errors" \
   --alarm-description "Lambda error or timeout detected" \
@@ -31,7 +31,7 @@ aws cloudwatch put-metric-alarm \
   --alarm-actions arn:aws:sns:eu-west-3:<account-id>:birds-pipeline-alerts \
   --region eu-west-3
 
-# Alarm: Lambda timeout (Duration approaching 3-min cap)
+# Alarma: timeout de Lambda (duración cercana al límite de 3 min)
 aws cloudwatch put-metric-alarm \
   --alarm-name "birds-ingestion-duration" \
   --alarm-description "Lambda execution approaching 3-minute timeout" \
@@ -49,23 +49,24 @@ aws cloudwatch put-metric-alarm \
 
 ---
 
-## EventBridge Daily Cron Rule (T039)
+## Regla Cron Diaria de EventBridge (T039)
 
-The Lambda is triggered daily via an Amazon EventBridge rule. The cron is set to run before the
-Power BI scheduled refresh (which runs at 08:00 UTC) — Lambda runs at **05:00 UTC** daily.
+La Lambda se dispara a diario mediante una regla de Amazon EventBridge. El cron está programado
+para ejecutarse antes de la actualización programada de Power BI (que se ejecuta a las 08:00
+UTC) — Lambda se ejecuta a diario a las **05:00 UTC**.
 
-### Cron Expression
+### Expresión Cron
 
 ```
 cron(0 5 * * ? *)
 ```
 
-Translates to: every day at 05:00 UTC (07:00 Paris time in winter, 07:00 CEST in summer).
+Equivale a: todos los días a las 05:00 UTC (06:00 hora de París en invierno, 07:00 CEST en verano).
 
 ### AWS CLI
 
 ```bash
-# Create EventBridge rule
+# Crear la regla de EventBridge
 aws events put-rule \
   --name "birds-ingestion-daily" \
   --schedule-expression "cron(0 5 * * ? *)" \
@@ -73,13 +74,13 @@ aws events put-rule \
   --description "Daily trigger for birds-inaturalist-ingestion Lambda" \
   --region eu-west-3
 
-# Add Lambda as target
+# Añadir la Lambda como destino
 aws events put-targets \
   --rule birds-ingestion-daily \
   --targets "Id=birds-lambda-target,Arn=arn:aws:lambda:eu-west-3:<account-id>:function:birds-inaturalist-ingestion" \
   --region eu-west-3
 
-# Grant EventBridge permission to invoke Lambda
+# Dar permiso a EventBridge para invocar la Lambda
 aws lambda add-permission \
   --function-name birds-inaturalist-ingestion \
   --statement-id "AllowEventBridgeTrigger" \
@@ -89,7 +90,7 @@ aws lambda add-permission \
   --region eu-west-3
 ```
 
-### Required IAM Permissions for Lambda Execution Role
+### Permisos IAM Necesarios para el Rol de Ejecución de Lambda
 
 ```json
 {
@@ -117,4 +118,4 @@ aws lambda add-permission \
 }
 ```
 
-No wildcard resource ARNs (constitution IV).
+Sin ARNs de recurso comodín (constitución IV).

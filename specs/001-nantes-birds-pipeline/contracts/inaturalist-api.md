@@ -1,8 +1,8 @@
-# Contract: iNaturalist API v1 — Observations Endpoint
+# Contrato: API v1 de iNaturalist — Endpoint de Observaciones
 
-**Consumer**: `ingestion/inaturalist_client.py` (Lambda)
-**Provider**: iNaturalist public API v1 (no authentication required)
-**Date**: 2026-10-10
+**Consumidor**: `ingestion/inaturalist_client.py` (Lambda)
+**Proveedor**: API pública v1 de iNaturalist (sin autenticación)
+**Fecha**: 2026-10-10
 
 ---
 
@@ -12,37 +12,38 @@
 GET https://api.inaturalist.org/v1/observations
 ```
 
-## Required Headers
+## Cabeceras Obligatorias
 
 ```
 User-Agent: oiseaux-nantes-pipeline/1.0 (contact: <pipeline-owner-email>)
 Accept: application/json
 ```
 
-The `User-Agent` header is **mandatory** per constitution principle II (Ethical API Ingestion).
+La cabecera `User-Agent` es **obligatoria** según el principio II de la constitución (Ingesta
+Ética de la API).
 
-## Query Parameters (Incremental Run)
+## Parámetros de Consulta (Ejecución Incremental)
 
-| Parameter | Type | Required | Example | Notes |
-|-----------|------|----------|---------|-------|
-| `taxon_id` | integer | Yes | `3` | Class Aves |
-| `swlat` | float | Yes | `46.8600781` | Greater Nantes bounding box |
-| `swlng` | float | Yes | `-2.6257395` | |
-| `nelat` | float | Yes | `47.8359431` | |
-| `nelng` | float | Yes | `-0.9466615` | |
-| `created_d1` | string | Yes (incremental) | `2024-05-01T00:00:00` | ISO 8601; lower bound on `created_at` |
-| `created_d2` | string | Yes (incremental) | `2024-05-01T23:59:59` | ISO 8601; upper bound on `created_at` |
-| `per_page` | integer | Yes | `200` | Maximum value: 200 |
-| `order_by` | string | Yes | `id` | Required for `id_above` cursor strategy |
-| `order` | string | Yes | `asc` | Ascending order on `id` |
-| `id_above` | integer | No (first page) | `123456` | Cursor for pages after first |
+| Parámetro | Tipo | Obligatorio | Ejemplo | Notas |
+|-----------|------|-------------|---------|-------|
+| `taxon_id` | integer | Sí | `3` | Clase Aves |
+| `swlat` | float | Sí | `46.8600781` | Bounding box del Gran Nantes |
+| `swlng` | float | Sí | `-2.6257395` | |
+| `nelat` | float | Sí | `47.8359431` | |
+| `nelng` | float | Sí | `-0.9466615` | |
+| `created_d1` | string | Sí (incremental) | `2024-05-01T00:00:00` | ISO 8601; límite inferior sobre `created_at` |
+| `created_d2` | string | Sí (incremental) | `2024-05-01T23:59:59` | ISO 8601; límite superior sobre `created_at` |
+| `per_page` | integer | Sí | `200` | Valor máximo: 200 |
+| `order_by` | string | Sí | `id` | Necesario para la estrategia de cursor `id_above` |
+| `order` | string | Sí | `asc` | Orden ascendente por `id` |
+| `id_above` | integer | No (primera página) | `123456` | Cursor para las páginas posteriores a la primera |
 
-**Note on `created_d1` on first run**: When no watermark exists, omit `created_d1`/`created_d2`
-to retrieve all historical observations.
+**Nota sobre `created_d1` en la primera ejecución**: Si no existe watermark, omitir
+`created_d1`/`created_d2` para obtener todas las observaciones históricas.
 
-## Pagination Strategy
+## Estrategia de Paginación
 
-Use `id_above` cursor (not page-based) to avoid the 10,000-result ceiling:
+Usar el cursor `id_above` (no paginación por páginas) para evitar el tope de 10.000 resultados:
 
 ```
 1. Call with per_page=200, order_by=id, order=asc (no id_above)
@@ -51,9 +52,9 @@ Use `id_above` cursor (not page-based) to avoid the 10,000-result ceiling:
 4. Else → call again with id_above=last_id; go to step 2
 ```
 
-**Rate limit**: 1 request per second (sleep 1s between calls).
+**Rate limit**: 1 petición por segundo (esperar 1 s entre llamadas).
 
-## Response Schema
+## Esquema de Respuesta
 
 ```json
 {
@@ -86,41 +87,41 @@ Use `id_above` cursor (not page-based) to avoid the 10,000-result ceiling:
 }
 ```
 
-## Field Contracts
+## Contratos de Campo
 
-| Field path | Type | Nullable | Constraint |
-|------------|------|----------|------------|
-| `results[].id` | integer | No | Unique per observation; use as dedup key |
-| `results[].created_at` | string | No | ISO 8601 with timezone offset |
-| `results[].observed_on` | string | No | `YYYY-MM-DD` format |
-| `results[].quality_grade` | string | No | One of: `research`, `needs_id`, `casual` |
-| `results[].location` | string | Yes | `"lat,lng"` format; null if coords obscured |
-| `results[].positional_accuracy` | integer | Yes | Meters |
-| `results[].taxon.id` | integer | No | iNaturalist taxon ID |
-| `results[].taxon.name` | string | No | Scientific name |
-| `results[].taxon.preferred_common_name` | string | Yes | Absent for uncommon taxa |
-| `results[].taxon.rank` | string | No | Taxonomic rank |
-| `results[].taxon.threatened` | boolean | No | iNaturalist flag |
-| `results[].user.id` | integer | No | iNaturalist user ID |
-| `results[].user.login` | string | No | Username |
-| `results[].user.name` | string | Yes | Display name |
+| Ruta del campo | Tipo | Admite nulos | Restricción |
+|----------------|------|--------------|-------------|
+| `results[].id` | integer | No | Único por observación; usar como clave de deduplicación |
+| `results[].created_at` | string | No | ISO 8601 con desfase horario |
+| `results[].observed_on` | string | No | Formato `YYYY-MM-DD` |
+| `results[].quality_grade` | string | No | Uno de: `research`, `needs_id`, `casual` |
+| `results[].location` | string | Sí | Formato `"lat,lng"`; null si las coordenadas están ocultas |
+| `results[].positional_accuracy` | integer | Sí | Metros |
+| `results[].taxon.id` | integer | No | ID de taxón de iNaturalist |
+| `results[].taxon.name` | string | No | Nombre científico |
+| `results[].taxon.preferred_common_name` | string | Sí | Ausente en taxones poco comunes |
+| `results[].taxon.rank` | string | No | Rango taxonómico |
+| `results[].taxon.threatened` | boolean | No | Bandera de iNaturalist |
+| `results[].user.id` | integer | No | ID de usuario de iNaturalist |
+| `results[].user.login` | string | No | Nombre de usuario |
+| `results[].user.name` | string | Sí | Nombre visible |
 
-## Error Handling Contract
+## Contrato de Gestión de Errores
 
-| HTTP Status | Meaning | Lambda behavior |
-|-------------|---------|-----------------|
-| 200 | Success | Parse and write to S3 |
-| 429 | Rate limited | Exponential backoff + retry (max 3 attempts) |
-| 500/503 | API error | Retry with backoff; fail Lambda after max retries |
-| Timeout | Network issue | Retry with backoff; fail Lambda after max retries |
+| Estado HTTP | Significado | Comportamiento de Lambda |
+|-------------|-------------|--------------------------|
+| 200 | Éxito | Parsear y escribir en S3 |
+| 429 | Rate limit alcanzado | Backoff exponencial + reintento (máx. 3 intentos) |
+| 500/503 | Error de la API | Reintento con backoff; Lambda falla tras agotar los reintentos |
+| Timeout | Problema de red | Reintento con backoff; Lambda falla tras agotar los reintentos |
 
-On Lambda failure: watermark is **NOT** updated; EventBridge retries on next schedule;
-CloudWatch alarm fires on Lambda error metric.
+Ante un fallo de Lambda: el watermark **NO** se actualiza; EventBridge reintenta en la siguiente
+programación; la alarma de CloudWatch salta con la métrica de errores de Lambda.
 
-## Storage Contract (Output)
+## Contrato de Almacenamiento (Salida)
 
-Each S3 file written by Lambda:
-- **Path**: `s3://{bucket}/raw/inaturalist/observations/year={YYYY}/month={MM}/{timestamp}.json`
-- **Format**: NDJSON — one JSON object per line (each `results[]` item is one line)
-- **Content**: Raw API response objects, exactly as received (no transformation)
-- **Encoding**: UTF-8
+Cada archivo S3 escrito por Lambda:
+- **Ruta**: `s3://{bucket}/raw/inaturalist/observations/year={YYYY}/month={MM}/{timestamp}.json`
+- **Formato**: NDJSON — un objeto JSON por línea (cada elemento de `results[]` es una línea)
+- **Contenido**: Objetos de respuesta de la API en crudo, exactamente como se reciben (sin transformación)
+- **Codificación**: UTF-8

@@ -1,76 +1,76 @@
-# Power BI Setup Guide — Nantes Birds Pipeline
+# Guía de Configuración de Power BI — Pipeline de Aves de Nantes
 
-## Prerequisites
+## Requisitos Previos
 
-- Power BI Desktop (latest)
-- Amazon Athena ODBC Driver 64-bit (Simba): download from the AWS Athena console or [Amazon S3](https://docs.aws.amazon.com/athena/latest/ug/connect-with-odbc.html)
-- AWS credentials with `athena:StartQueryExecution`, `athena:GetQueryResults`, `s3:GetObject`, `s3:PutObject` on the staging bucket
+- Power BI Desktop (última versión)
+- Driver ODBC de Amazon Athena de 64 bits (Simba): descargar desde la consola de AWS Athena o desde [Amazon S3](https://docs.aws.amazon.com/athena/latest/ug/connect-with-odbc.html)
+- Credenciales de AWS con `athena:StartQueryExecution`, `athena:GetQueryResults`, `s3:GetObject`, `s3:PutObject` sobre el bucket de staging
 
 ---
 
-## Step 1: Install the Athena ODBC Driver
+## Paso 1: Instalar el Driver ODBC de Athena
 
-1. Download the 64-bit Simba Amazon Athena ODBC Driver installer.
-2. Run the installer and accept defaults.
-3. Open **ODBC Data Source Administrator (64-bit)** from Windows.
-4. Click **System DSN → Add → Simba Amazon Athena ODBC Driver**.
-5. Configure:
+1. Descargar el instalador del Simba Amazon Athena ODBC Driver de 64 bits.
+2. Ejecutar el instalador y aceptar los valores por defecto.
+3. Abrir **ODBC Data Source Administrator (64-bit)** en Windows.
+4. Hacer clic en **System DSN → Add → Simba Amazon Athena ODBC Driver**.
+5. Configurar:
    - **Data Source Name**: `AthenaNantesBirds`
    - **AWS Region**: `eu-west-3`
    - **S3 Output Location**: `s3://<your-bucket>/athena-results/`
-   - **Authentication Type**: `IAM Credentials` (or `Default Credentials` for SSO)
+   - **Authentication Type**: `IAM Credentials` (o `Default Credentials` para SSO)
    - **Schema**: `birds_dbt`
-6. Click **Test** to verify connectivity, then **OK**.
+6. Hacer clic en **Test** para verificar la conectividad y luego en **OK**.
 
 ---
 
-## Step 2: Connect Power BI Desktop
+## Paso 2: Conectar Power BI Desktop
 
-1. Open Power BI Desktop.
+1. Abrir Power BI Desktop.
 2. **Home → Get Data → ODBC**.
-3. Select the DSN `AthenaNantesBirds` from the dropdown.
-4. Click **OK**.
-5. In the Navigator, expand `birds_dbt` and select all four mart tables:
+3. Seleccionar el DSN `AthenaNantesBirds` en el desplegable.
+4. Hacer clic en **OK**.
+5. En el Navigator, desplegar `birds_dbt` y seleccionar las cuatro tablas de marts:
    - `fct_observations`
    - `dim_species`
    - `dim_users`
    - `dim_date`
-6. Choose **Import** mode (not DirectQuery).
-7. Click **Load**.
+6. Elegir el modo **Import** (no DirectQuery).
+7. Hacer clic en **Load**.
 
 ---
 
-## Step 3: Configure Relationships (Model View)
+## Paso 3: Configurar las Relaciones (Vista Model)
 
-Switch to **Model view** in Power BI and create the following relationships:
+Cambiar a la **Model view** de Power BI y crear las siguientes relaciones:
 
-| From table | From column | To table | To column | Cardinality |
-|-----------|-------------|----------|-----------|-------------|
+| Tabla origen | Columna origen | Tabla destino | Columna destino | Cardinalidad |
+|--------------|----------------|---------------|-----------------|--------------|
 | `fct_observations` | `species_key` | `dim_species` | `species_key` | Many-to-One |
 | `fct_observations` | `user_key` | `dim_users` | `user_key` | Many-to-One |
 | `fct_observations` | `date_key` | `dim_date` | `date_key` | Many-to-One |
 
 ---
 
-## Step 4: Build the Three Required Visuals
+## Paso 4: Construir los Tres Visuales Requeridos
 
-### 4a. Geospatial Map (FR-013)
-- Visual type: **Map** or **ArcGIS Maps for Power BI**
-- Latitude: `fct_observations[latitude]`
-- Longitude: `fct_observations[longitude]`
+### 4a. Mapa Geoespacial (FR-013)
+- Tipo de visual: **Map** o **ArcGIS Maps for Power BI**
+- Latitud: `fct_observations[latitude]`
+- Longitud: `fct_observations[longitude]`
 - Tooltip: `dim_species[common_name]`, `fct_observations[quality_grade]`
-- Add a **Slicer** on `dim_species[common_name]`
+- Añadir un **Slicer** sobre `dim_species[common_name]`
 
-### 4b. Seasonal Trend Bar Chart
-- Visual type: **Clustered Bar Chart**
-- X-axis: `dim_date[month_name]`
-- Y-axis: `COUNT(fct_observations[observation_id])`
-- Legend: `dim_date[biological_season]` (Primavera / Verano / Otoño / Invierno)
-- Add a **Date Range Slicer** on `dim_date[date_key]`
+### 4b. Gráfico de Barras de Tendencia Estacional
+- Tipo de visual: **Clustered Bar Chart**
+- Eje X: `dim_date[month_name]`
+- Eje Y: `COUNT(fct_observations[observation_id])`
+- Leyenda: `dim_date[biological_season]` (Primavera / Verano / Otoño / Invierno)
+- Añadir un **Date Range Slicer** sobre `dim_date[date_key]`
 
-### 4c. Ranking Table + DAX Measures (FR-012)
+### 4c. Tabla de Ranking + Medidas DAX (FR-012)
 
-Add these measures to `fct_observations`:
+Añadir estas medidas a `fct_observations`:
 
 ```dax
 Total Observations = COUNTROWS(fct_observations)
@@ -84,27 +84,27 @@ Research Grade % =
     )
 ```
 
-Table visual columns:
-- `dim_species[common_name]` + `COUNT(fct_observations[observation_id])` sorted DESC
-- `dim_users[login]` + `COUNT(fct_observations[observation_id])` sorted DESC
+Columnas del visual de tabla:
+- `dim_species[common_name]` + `COUNT(fct_observations[observation_id])` ordenado DESC
+- `dim_users[login]` + `COUNT(fct_observations[observation_id])` ordenado DESC
 
 ---
 
-## Step 5: Publish to Power BI Service
+## Paso 5: Publicar en Power BI Service
 
-1. **Home → Publish** → select your workspace.
-2. In the Power BI Service, navigate to the dataset settings.
-3. Under **Scheduled Refresh**, configure:
-   - Frequency: **Daily**
-   - Time: set to run **after** the EventBridge Lambda cron trigger (see `docs/infrastructure.md`)
-   - Credentials: enter AWS credentials for the ODBC connection
+1. **Home → Publish** → seleccionar el workspace.
+2. En Power BI Service, ir a la configuración del dataset.
+3. En **Scheduled Refresh**, configurar:
+   - Frecuencia: **Diaria**
+   - Hora: programarla **después** del disparo cron de EventBridge sobre Lambda (ver `docs/infrastructure.md`)
+   - Credenciales: introducir las credenciales de AWS de la conexión ODBC
 
 ---
 
-## Verification Checklist
+## Checklist de Verificación
 
-- [ ] Map renders geolocated observations within the Nantes boundary
-- [ ] Seasonal chart shows monthly counts with 4 biological season colours
-- [ ] Ranking table lists top species and top observers
-- [ ] Cross-filtering works across all three visuals
-- [ ] After pipeline re-run and dataset refresh, new observations appear without manual intervention
+- [ ] El mapa muestra las observaciones geolocalizadas dentro del límite de Nantes
+- [ ] El gráfico estacional muestra los recuentos mensuales con los 4 colores de estación biológica
+- [ ] La tabla de ranking lista las especies y los observadores principales
+- [ ] El filtrado cruzado funciona entre los tres visuales
+- [ ] Tras re-ejecutar el pipeline y actualizar el dataset, las observaciones nuevas aparecen sin intervención manual

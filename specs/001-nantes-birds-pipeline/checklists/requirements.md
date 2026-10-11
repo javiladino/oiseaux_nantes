@@ -1,36 +1,36 @@
-# Specification Quality Checklist: Nantes Biodiversity Analytics Pipeline
+# Checklist de Calidad de la Especificación: Pipeline Analítico de Biodiversidad en Nantes
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-10-10
+**Propósito**: Validar la completitud y calidad de la especificación antes de pasar a la planificación
+**Creado**: 2026-10-10
 **Feature**: [spec.md](../spec.md)
 
-## Content Quality
+## Calidad del Contenido
 
-- [x] No implementation details (languages, frameworks, APIs)
-- [x] Focused on user value and business needs
-- [x] Written for non-technical stakeholders
-- [x] All mandatory sections completed
+- [x] Sin detalles de implementación (lenguajes, frameworks, APIs)
+- [x] Centrada en el valor para el usuario y las necesidades de negocio
+- [x] Redactada para partes interesadas no técnicas
+- [x] Todas las secciones obligatorias completadas
 
-## Requirement Completeness
+## Completitud de los Requisitos
 
-- [x] No [NEEDS CLARIFICATION] markers remain
-- [x] Requirements are testable and unambiguous
-- [x] Success criteria are measurable
-- [x] Success criteria are technology-agnostic (no implementation details)
-- [x] All acceptance scenarios are defined
-- [x] Edge cases are identified
-- [x] Scope is clearly bounded
-- [x] Dependencies and assumptions identified
+- [x] No quedan marcadores [NEEDS CLARIFICATION]
+- [x] Los requisitos son comprobables y no ambiguos
+- [x] Los criterios de éxito son medibles
+- [x] Los criterios de éxito son agnósticos a la tecnología (sin detalles de implementación)
+- [x] Todos los escenarios de aceptación están definidos
+- [x] Los casos límite están identificados
+- [x] El alcance está claramente delimitado
+- [x] Las dependencias y los supuestos están identificados
 
-## Feature Readiness
+## Preparación del Feature
 
-- [x] All functional requirements have clear acceptance criteria
-- [x] User scenarios cover primary flows
-- [x] Feature meets measurable outcomes defined in Success Criteria
-- [x] No implementation details leak into specification
+- [x] Todos los requisitos funcionales tienen criterios de aceptación claros
+- [x] Los escenarios de usuario cubren los flujos principales
+- [x] El feature cumple los resultados medibles definidos en los Criterios de Éxito
+- [x] No se filtran detalles de implementación en la especificación
 
-## Notes
+## Notas
 
-- All 17 checklist items pass. Spec is ready for `/speckit-clarify` or `/speckit-plan`.
-- The constitution's medallion architecture (stg → int → marts) and quality principles are fully reflected in FR-004 through FR-015 and SC-004.
-- Power BI connection mode (Import vs DirectQuery) is intentionally left as an implementation decision for the planning phase — it does not affect feature scope or user outcomes.
+- Los 17 elementos del checklist se cumplen. La spec está lista para `/speckit-clarify` o `/speckit-plan`.
+- La arquitectura medallón de la constitución (stg → int → marts) y sus principios de calidad se reflejan por completo en FR-004 a FR-015 y en SC-004.
+- El modo de conexión de Power BI (Import vs DirectQuery) se deja intencionadamente como decisión de implementación para la fase de planificación — no afecta al alcance del feature ni a los resultados para el usuario.

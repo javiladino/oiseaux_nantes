@@ -1,281 +1,282 @@
-# Quickstart Validation Guide: Nantes Birds Pipeline
+# Guía de Validación Rápida: Pipeline de Aves de Nantes
 
-**Feature**: `001-nantes-birds-pipeline` | **Date**: 2026-10-10
+**Feature**: `001-nantes-birds-pipeline` | **Fecha**: 2026-10-10
 
-This guide documents runnable validation scenarios that prove each pipeline layer works
-end-to-end. It is not an implementation guide — for model definitions see [data-model.md](data-model.md),
-for API details see [contracts/inaturalist-api.md](contracts/inaturalist-api.md).
-
----
-
-## Prerequisites
-
-| Prerequisite | Check |
-|-------------|-------|
-| AWS CLI configured (`eu-west-3`) | `aws sts get-caller-identity` |
-| S3 bucket exists with correct prefix | `aws s3 ls s3://{bucket}/raw/inaturalist/` |
-| SSM parameter created (or absent for first run) | `aws ssm get-parameter --name /birds-pipeline/last_successful_run_date` |
-| Athena workgroup + Glue databases (`birds_raw`, `birds_dbt`) exist | AWS Console / Athena |
-| dbt project installed and profiles.yml configured | `dbt debug` |
-| Python 3.11+ and Lambda dependencies installed locally | `python --version` |
+Esta guía documenta escenarios de validación ejecutables que demuestran que cada capa del
+pipeline funciona de extremo a extremo. No es una guía de implementación — para las
+definiciones de los modelos ver [data-model.md](data-model.md), para los detalles de la API ver
+[contracts/inaturalist-api.md](contracts/inaturalist-api.md).
 
 ---
 
-## Scenario 1: First-Run Ingestion (Story 1, AC-1)
+## Requisitos Previos
 
-**What it proves**: FR-001/002/003, SC-001, SC-006 (first run baseline)
+| Requisito | Comprobación |
+|-----------|--------------|
+| AWS CLI configurado (`eu-west-3`) | `aws sts get-caller-identity` |
+| El bucket S3 existe con el prefijo correcto | `aws s3 ls s3://{bucket}/raw/inaturalist/` |
+| Parámetro SSM creado (o ausente en la primera ejecución) | `aws ssm get-parameter --name /birds-pipeline/last_successful_run_date` |
+| Existen el workgroup de Athena + las bases de datos de Glue (`birds_raw`, `birds_dbt`) | Consola de AWS / Athena |
+| Proyecto dbt instalado y profiles.yml configurado | `dbt debug` |
+| Python 3.11+ y dependencias de Lambda instaladas localmente | `python --version` |
 
-### Steps
+---
+
+## Escenario 1: Ingesta de Primera Ejecución (Historia 1, AC-1)
+
+**Qué demuestra**: FR-001/002/003, SC-001, SC-006 (línea base de la primera ejecución)
+
+### Pasos
 
 ```bash
-# 1. Confirm no watermark exists (first run)
+# 1. Confirmar que no existe watermark (primera ejecución)
 aws ssm get-parameter --name /birds-pipeline/last_successful_run_date
-# Expected: ParameterNotFound error
+# Esperado: error ParameterNotFound
 
-# 2. Invoke Lambda (locally or via AWS Console test event)
+# 2. Invocar Lambda (en local o con un evento de prueba en la consola de AWS)
 aws lambda invoke \
   --function-name birds-inaturalist-ingestion \
   --payload '{}' \
   response.json
 cat response.json
-# Expected: {"statusCode": 200, "body": "Ingested N observations"}
+# Esperado: {"statusCode": 200, "body": "Ingested N observations"}
 
-# 3. Verify S3 files created under current year/month partition
+# 3. Verificar que se crearon archivos en S3 bajo la partición del año/mes actual
 aws s3 ls s3://{bucket}/raw/inaturalist/observations/ --recursive
-# Expected: files under year=YYYY/month=MM/
+# Esperado: archivos bajo year=YYYY/month=MM/
 
-# 4. Spot-check one file contains valid JSON observations
+# 4. Comprobar que un archivo contiene observaciones JSON válidas
 aws s3 cp s3://{bucket}/raw/inaturalist/observations/year=.../month=.../{file}.json - | head -1 | python3 -m json.tool
-# Expected: well-formed JSON with id, created_at, location, taxon, user fields
+# Esperado: JSON bien formado con los campos id, created_at, location, taxon, user
 
-# 5. Confirm watermark was updated
+# 5. Confirmar que el watermark se actualizó
 aws ssm get-parameter --name /birds-pipeline/last_successful_run_date
-# Expected: {"Parameter": {"Value": "YYYY-MM-DDTHH:MM:SS"}}
+# Esperado: {"Parameter": {"Value": "YYYY-MM-DDTHH:MM:SS"}}
 ```
 
-### Expected Outcome
-- One or more NDJSON files present in S3 under the correct partition
-- Each line is a valid JSON observation object
-- SSM parameter holds today's run timestamp
-- No duplicate `id` values across all files (spot-check)
+### Resultado Esperado
+- Uno o más archivos NDJSON presentes en S3 bajo la partición correcta
+- Cada línea es un objeto de observación JSON válido
+- El parámetro SSM contiene la marca de tiempo de la ejecución de hoy
+- No hay valores de `id` duplicados entre archivos (comprobación puntual)
 
 ---
 
-## Scenario 2: Incremental Run — No Duplicates (Story 1, AC-2/3/4)
+## Escenario 2: Ejecución Incremental — Sin Duplicados (Historia 1, AC-2/3/4)
 
-**What it proves**: FR-002/014, SC-002/006
+**Qué demuestra**: FR-002/014, SC-002/006
 
-### Steps
+### Pasos
 
 ```bash
-# 1. Record the current observation count in S3
+# 1. Anotar el número actual de archivos en S3
 aws s3 ls s3://{bucket}/raw/inaturalist/observations/ --recursive | wc -l
-# Note: file_count_before
+# Anotar: file_count_before
 
-# 2. Invoke Lambda again (same day — should find 0 or few new observations)
+# 2. Invocar Lambda de nuevo (el mismo día — debería encontrar 0 o pocas observaciones nuevas)
 aws lambda invoke \
   --function-name birds-inaturalist-ingestion \
   --payload '{}' \
   response2.json
 cat response2.json
 
-# 3. Verify file count did not change (if 0 new obs) or increased by exactly new obs count
+# 3. Verificar que el número de archivos no cambió (si hay 0 obs. nuevas) o aumentó en uno
 aws s3 ls s3://{bucket}/raw/inaturalist/observations/ --recursive | wc -l
-# Expected: file_count_before (if 0 new) or file_count_before + 1
+# Esperado: file_count_before (si 0 nuevas) o file_count_before + 1
 
-# 4. Verify observation IDs across all files are unique (run Athena query):
+# 4. Verificar que los IDs de observación son únicos entre todos los archivos (consulta Athena):
 # SELECT COUNT(*), COUNT(DISTINCT id) FROM raw_inaturalist.observations
-# Expected: COUNT(*) = COUNT(DISTINCT id)
+# Esperado: COUNT(*) = COUNT(DISTINCT id)
 ```
 
-### Expected Outcome
-- No new files if no new observations since last run
-- Re-running produces same final state (idempotent)
-- No duplicate `id` values across partitions
+### Resultado Esperado
+- Ningún archivo nuevo si no hay observaciones nuevas desde la última ejecución
+- Re-ejecutar produce el mismo estado final (idempotente)
+- Sin valores de `id` duplicados entre particiones
 
 ---
 
-## Scenario 3: dbt Staging Model Validation (Story 2, AC-1)
+## Escenario 3: Validación del Modelo de Staging en dbt (Historia 2, AC-1)
 
-**What it proves**: FR-004, FR-008/010/015, SC-004
+**Qué demuestra**: FR-004, FR-008/010/015, SC-004
 
-### Steps
+### Pasos
 
 ```bash
-# 1. Register external raw table (run once after raw data exists)
+# 1. Registrar la tabla raw externa (una sola vez, cuando ya existan datos raw)
 cd dbt_birds
 dbt run-operation stage_external_sources
 
-# 2. Run staging model
+# 2. Ejecutar el modelo de staging
 dbt run --select stg_inaturalist__observations
 
-# 3. Run staging tests
+# 3. Ejecutar los tests de staging
 dbt test --select stg_inaturalist__observations
-# Expected: All tests pass (0 failures, 0 warnings)
+# Esperado: todos los tests pasan (0 fallos, 0 avisos)
 
-# 4. Verify flattening in Athena console or dbt:
+# 4. Verificar el aplanado en la consola de Athena o con dbt:
 # SELECT observation_id, latitude, longitude, taxon_scientific_name, user_login
 # FROM birds_dbt.stg_inaturalist__observations LIMIT 5
-# Expected: All columns populated (latitude/longitude as DOUBLE, not "lat,lng" string)
+# Esperado: todas las columnas pobladas (latitude/longitude como DOUBLE, no la cadena "lat,lng")
 ```
 
-### Expected Outcome
-- `dbt test` reports 0 failures
-- `observation_id` is unique and non-null
-- `latitude`/`longitude` are separate DOUBLE columns
+### Resultado Esperado
+- `dbt test` informa 0 fallos
+- `observation_id` es único y no nulo
+- `latitude`/`longitude` son columnas DOUBLE separadas
 - `quality_grade` ∈ {research, needs_id, casual}
 
 ---
 
-## Scenario 4: Intermediate Model — Bounding Box Validation (Story 2, AC-2)
+## Escenario 4: Modelo Intermedio — Validación del Bounding Box (Historia 2, AC-2)
 
-**What it proves**: FR-005/006/007, SC-003
+**Qué demuestra**: FR-005/006/007, SC-003
 
-### Steps
+### Pasos
 
 ```bash
-# 1. Run intermediate model
+# 1. Ejecutar el modelo intermedio
 dbt run --select int_observations__geospatial_enriched
 
-# 2. Run tests including custom bbox test
+# 2. Ejecutar los tests, incluido el test bbox personalizado
 dbt test --select int_observations__geospatial_enriched
-# Expected: All tests pass including assert_observations_within_nantes_bbox
+# Esperado: todos los tests pasan, incluido assert_observations_within_nantes_bbox
 
-# 3. Verify bbox containment in Athena:
+# 3. Verificar la contención en el bbox en Athena:
 # SELECT MIN(latitude), MAX(latitude), MIN(longitude), MAX(longitude)
 # FROM birds_dbt.int_observations__geospatial_enriched
-# Expected: lat ∈ [46.86, 47.84], lng ∈ [-2.63, -0.95]
+# Esperado: lat ∈ [46.86, 47.84], lng ∈ [-2.63, -0.95]
 
-# 4. Verify observation_period distribution:
+# 4. Verificar la distribución de observation_period:
 # SELECT observation_period, COUNT(*) FROM birds_dbt.int_observations__geospatial_enriched
 # GROUP BY observation_period ORDER BY 2 DESC
-# Expected: 4 rows, all periods present (Madrugada/Mañana/Tarde/Noche)
+# Esperado: 4 filas, todos los períodos presentes (Madrugada/Mañana/Tarde/Noche)
 
-# 5. Verify is_research_grade:
-# SELECT is_research_grade, quality_grade, COUNT(*) 
+# 5. Verificar is_research_grade:
+# SELECT is_research_grade, quality_grade, COUNT(*)
 # FROM birds_dbt.int_observations__geospatial_enriched
 # GROUP BY 1, 2
-# Expected: is_research_grade=true only where quality_grade='research'
+# Esperado: is_research_grade=true solo donde quality_grade='research'
 ```
 
-### Expected Outcome
-- 0 records outside Nantes bounding box
-- All 4 `observation_period` values present
-- `is_research_grade` correctly derived from `quality_grade`
+### Resultado Esperado
+- 0 registros fuera del bounding box de Nantes
+- Los 4 valores de `observation_period` presentes
+- `is_research_grade` derivado correctamente de `quality_grade`
 
 ---
 
-## Scenario 5: Full Mart Layer — Star Schema Integrity (Story 2, AC-3/4/5)
+## Escenario 5: Capa de Marts Completa — Integridad del Esquema Estrella (Historia 2, AC-3/4/5)
 
-**What it proves**: FR-008/009/011/012, SC-002/004
+**Qué demuestra**: FR-008/009/011/012, SC-002/004
 
-### Steps
+### Pasos
 
 ```bash
-# 1. Run full dbt DAG (first run: must use --full-refresh for incremental models)
+# 1. Ejecutar el DAG completo de dbt (primera ejecución: usar --full-refresh para los modelos incrementales)
 dbt run --full-refresh
-# Or for incremental runs after first:
+# O, para ejecuciones incrementales posteriores:
 dbt run
 
-# 2. Run all tests
+# 2. Ejecutar todos los tests
 dbt test
-# Expected: 0 failures across all models
+# Esperado: 0 fallos en todos los modelos
 
-# 3. Verify primary key uniqueness in Athena:
+# 3. Verificar la unicidad de la clave primaria en Athena:
 # SELECT COUNT(*), COUNT(DISTINCT observation_id) FROM birds_dbt.fct_observations
-# Expected: both counts equal
+# Esperado: ambos recuentos iguales
 
-# 4. Verify referential integrity (no orphan FKs):
+# 4. Verificar la integridad referencial (sin FKs huérfanas):
 # SELECT COUNT(*) FROM birds_dbt.fct_observations f
 # LEFT JOIN birds_dbt.dim_species s ON f.species_key = s.species_key
 # WHERE s.species_key IS NULL
-# Expected: 0
+# Esperado: 0
 
-# Repeat for dim_users and dim_date
+# Repetir para dim_users y dim_date
 
-# 5. Verify dim_date covers full observation range:
+# 5. Verificar que dim_date cubre todo el rango de observaciones:
 # SELECT MIN(date_key), MAX(date_key) FROM birds_dbt.dim_date
-# vs
+# frente a
 # SELECT MIN(observed_on), MAX(observed_on) FROM birds_dbt.fct_observations
-# Expected: dim_date range ⊇ fct_observations observed_on range
+# Esperado: rango de dim_date ⊇ rango de observed_on en fct_observations
 
-# 6. Verify the 3 analytical metrics (FR-012):
+# 6. Verificar las 3 métricas analíticas (FR-012):
 # SELECT
 #   COUNT(*) AS total_observations,
 #   COUNT(DISTINCT species_key) AS distinct_species,
 #   SUM(CASE WHEN is_research_grade THEN 1 ELSE 0 END) * 100.0 / COUNT(*) AS research_grade_pct
 # FROM birds_dbt.fct_observations
-# Expected: 3 numeric values, research_grade_pct between 0 and 100
+# Esperado: 3 valores numéricos, research_grade_pct entre 0 y 100
 ```
 
-### Expected Outcome
-- `dbt test` passes 100% across all mart models
-- No duplicate `observation_id` in `fct_observations`
-- All FK relationships intact
-- `dim_date` fully covers observation date range
-- 3 analytical metrics return valid values
+### Resultado Esperado
+- `dbt test` pasa al 100 % en todos los modelos de marts
+- Sin `observation_id` duplicados en `fct_observations`
+- Todas las relaciones FK intactas
+- `dim_date` cubre por completo el rango de fechas de observación
+- Las 3 métricas analíticas devuelven valores válidos
 
 ---
 
-## Scenario 6: Power BI End-to-End Refresh (Story 3)
+## Escenario 6: Actualización End-to-End en Power BI (Historia 3)
 
-**What it proves**: FR-012/013, SC-001/005
+**Qué demuestra**: FR-012/013, SC-001/005
 
-### Steps
+### Pasos
 
-1. Open Power BI Desktop
-2. Connect via ODBC (Amazon Athena driver):
-   - Server: `athena.eu-west-3.amazonaws.com`
-   - Database: `birds_dbt`
-3. Import these tables: `fct_observations`, `dim_species`, `dim_users`, `dim_date`
-4. Set relationships in Model view (see [contracts/dbt-models.md](contracts/dbt-models.md))
-5. Create the 3 required visuals:
-   - **Map visual**: Plot `latitude`/`longitude` from `fct_observations`; filter slicer on `dim_species[common_name]`
-   - **Seasonal trend**: Line/bar chart of `COUNT(observation_id)` by `dim_date[month_name]` coloured by `dim_date[biological_season]`
-   - **Ranking table**: `dim_species[common_name]`, `COUNT(observation_id)` DESC + `dim_users[login]`, `COUNT(observation_id)` DESC
-6. Publish to Power BI Service
-7. Configure scheduled refresh (daily, time after Lambda EventBridge execution)
+1. Abrir Power BI Desktop
+2. Conectar por ODBC (driver de Amazon Athena):
+   - Servidor: `athena.eu-west-3.amazonaws.com`
+   - Base de datos: `birds_dbt`
+3. Importar estas tablas: `fct_observations`, `dim_species`, `dim_users`, `dim_date`
+4. Definir las relaciones en la vista Model (ver [contracts/dbt-models.md](contracts/dbt-models.md))
+5. Crear los 3 visuales requeridos:
+   - **Visual de mapa**: Representar `latitude`/`longitude` de `fct_observations`; segmentador de filtro sobre `dim_species[common_name]`
+   - **Tendencia estacional**: Gráfico de líneas/barras de `COUNT(observation_id)` por `dim_date[month_name]` coloreado por `dim_date[biological_season]`
+   - **Tabla de ranking**: `dim_species[common_name]`, `COUNT(observation_id)` DESC + `dim_users[login]`, `COUNT(observation_id)` DESC
+6. Publicar en Power BI Service
+7. Configurar la actualización programada (diaria, a una hora posterior a la ejecución de Lambda por EventBridge)
 
-### Expected Outcome
-- Map renders geolocated bird observations within Nantes boundary
-- Seasonal trend shows monthly counts with `Primavera`/`Verano`/`Otoño`/`Invierno` colouring
-- Ranking table lists top species and top observers
-- After pipeline re-run, dataset refresh pulls new data without manual intervention (SC-001)
+### Resultado Esperado
+- El mapa muestra las observaciones de aves geolocalizadas dentro del límite de Nantes
+- La tendencia estacional muestra los recuentos mensuales coloreados por `Primavera`/`Verano`/`Otoño`/`Invierno`
+- La tabla de ranking lista las especies y los observadores principales
+- Tras re-ejecutar el pipeline, la actualización del dataset trae los datos nuevos sin intervención manual (SC-001)
 
 ---
 
-## Scenario 7: Idempotency Under Failure (SC-006)
+## Escenario 7: Idempotencia ante Fallos (SC-006)
 
-**What it proves**: FR-003/014, SC-006
+**Qué demuestra**: FR-003/014, SC-006
 
-### Steps
+### Pasos
 
 ```bash
-# 1. Simulate partial Lambda failure (set Lambda timeout to 5s — shorter than normal run)
-# Then invoke Lambda → it should fail mid-pagination
+# 1. Simular un fallo parcial de Lambda (fijar el timeout de Lambda en 5 s — menos que una ejecución normal)
+# Después invocar Lambda → debería fallar a mitad de la paginación
 
-# 2. Verify SSM watermark was NOT updated
+# 2. Verificar que el watermark de SSM NO se actualizó
 aws ssm get-parameter --name /birds-pipeline/last_successful_run_date
-# Expected: same value as before the failed run
+# Esperado: el mismo valor que antes de la ejecución fallida
 
-# 3. Restore normal Lambda timeout (180s)
-# Re-invoke Lambda — it should start from the same watermark and complete normally
+# 3. Restaurar el timeout normal de Lambda (180 s)
+# Re-invocar Lambda — debería partir del mismo watermark y completarse con normalidad
 
-# 4. Check for duplicate observation IDs in S3/Athena
-# (Same Athena query as Scenario 2, Step 4)
-# Expected: COUNT(*) = COUNT(DISTINCT id)
+# 4. Comprobar que no hay IDs de observación duplicados en S3/Athena
+# (La misma consulta de Athena que en el Escenario 2, Paso 4)
+# Esperado: COUNT(*) = COUNT(DISTINCT id)
 ```
 
-### Expected Outcome
-- Failed run leaves watermark unchanged
-- Re-run completes successfully from the same watermark
-- No duplicate `observation_id` values in any layer
+### Resultado Esperado
+- La ejecución fallida deja el watermark sin cambios
+- La re-ejecución se completa correctamente desde el mismo watermark
+- Sin valores de `observation_id` duplicados en ninguna capa
 
 ---
 
-## CI Validation (GitHub Actions)
+## Validación en CI (GitHub Actions)
 
-Every PR touching `dbt_birds/` triggers:
+Cada PR que modifica `dbt_birds/` dispara:
 
 ```yaml
 # .github/workflows/dbt_ci.yml
@@ -283,5 +284,5 @@ Every PR touching `dbt_birds/` triggers:
 - run: dbt test --select state:modified+
 ```
 
-A failed `dbt test` must block the PR merge (constitution III). Check the workflow status
-badge or Actions tab before merging.
+Un `dbt test` fallido debe bloquear el merge del PR (constitución III). Revisar el badge de
+estado del workflow o la pestaña Actions antes de hacer merge.

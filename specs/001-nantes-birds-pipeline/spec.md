@@ -115,9 +115,9 @@ Un analista de BI o investigador quiere explorar los patrones de observaciones d
 
 ### Session 2026-10-10
 
-- Q: Where should Lambda persist the ingestion watermark (timestamp of last successful run)? → A: SSM Parameter Store (atomic `String` parameter, updated only on success; Lambda IAM role scoped to that single parameter ARN).
-- Q: Should Power BI connect to Athena using Import mode or DirectQuery? → A: Import mode with daily scheduled refresh (aligned with ingestion cadence; DirectQuery excluded from v1 due to cost).
-- Q: What observability signal should the pipeline emit on failure? → A: CloudWatch Alarm on Lambda error/timeout metric → SNS topic → email alert; dbt CI failures via GitHub Actions workflow failure notification.
+- Q: ¿Dónde debe persistir Lambda el watermark de ingesta (marca de tiempo de la última ejecución exitosa)? → A: En SSM Parameter Store (parámetro `String` atómico, actualizado solo en caso de éxito; rol IAM de Lambda restringido al ARN de ese único parámetro).
+- Q: ¿Power BI debe conectarse a Athena en modo Import o DirectQuery? → A: Modo Import con actualización programada diaria (alineada con la cadencia de ingesta; DirectQuery queda excluido de la v1 por su coste).
+- Q: ¿Qué señal de observabilidad debe emitir el pipeline ante un fallo? → A: Alarma de CloudWatch sobre la métrica de errores/timeouts de Lambda → topic SNS → alerta por correo electrónico; los fallos de dbt en CI se notifican mediante el fallo del workflow de GitHub Actions.
 
 ## Supuestos
 

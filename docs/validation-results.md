@@ -1,15 +1,15 @@
-# Validation Results — Nantes Birds Pipeline
+# Resultados de Validación — Pipeline de Aves de Nantes
 
-**Reference**: `specs/001-nantes-birds-pipeline/quickstart.md`
+**Referencia**: `specs/001-nantes-birds-pipeline/quickstart.md`
 
 ---
 
-## Unit Test Results (No Live AWS Required)
+## Resultados de los Tests Unitarios (Sin AWS Real)
 
-Executed via `PYTHONPATH=ingestion pytest tests/unit/ -v`:
+Ejecutados con `PYTHONPATH=ingestion pytest tests/unit/ -v`:
 
-| Module | Tests | Result |
-|--------|-------|--------|
+| Módulo | Tests | Resultado |
+|--------|-------|-----------|
 | `test_inaturalist_client.py` | 6 | ✅ PASS |
 | `test_s3_writer.py` | 4 | ✅ PASS |
 | `test_ssm_watermark.py` | 4 | ✅ PASS |
@@ -17,31 +17,31 @@ Executed via `PYTHONPATH=ingestion pytest tests/unit/ -v`:
 
 ---
 
-## End-to-End Scenario Status (Requires Live AWS)
+## Estado de los Escenarios End-to-End (Requieren AWS Real)
 
-| Scenario | Description | Status | Notes |
-|----------|-------------|--------|-------|
-| 1 | First-run ingestion | PENDING | Requires live Lambda + S3 + SSM |
-| 2 | Incremental run — no duplicates | PENDING | Requires Scenario 1 baseline |
-| 3 | dbt staging model validation | PENDING | Requires raw data in S3 + Athena |
-| 4 | Intermediate bbox validation | PENDING | Requires Scenario 3 baseline |
-| 5 | Full mart layer star schema integrity | PENDING | Requires Scenario 4 baseline |
-| 6 | Power BI end-to-end refresh | PENDING | Requires Scenario 5 + Power BI Desktop |
-| 7 | Idempotency under failure | PENDING | Requires Scenarios 1–2 complete |
+| Escenario | Descripción | Estado | Notas |
+|-----------|-------------|--------|-------|
+| 1 | Ingesta de primera ejecución | PENDIENTE | Requiere Lambda + S3 + SSM reales |
+| 2 | Ejecución incremental — sin duplicados | PENDIENTE | Requiere la línea base del Escenario 1 |
+| 3 | Validación del modelo de staging en dbt | PENDIENTE | Requiere datos raw en S3 + Athena |
+| 4 | Validación del bbox en la capa intermedia | PENDIENTE | Requiere la línea base del Escenario 3 |
+| 5 | Integridad completa del esquema estrella en marts | PENDIENTE | Requiere la línea base del Escenario 4 |
+| 6 | Actualización end-to-end en Power BI | PENDIENTE | Requiere el Escenario 5 + Power BI Desktop |
+| 7 | Idempotencia ante fallos | PENDIENTE | Requiere completar los Escenarios 1–2 |
 
 ---
 
-## How to Run End-to-End Validation
+## Cómo Ejecutar la Validación End-to-End
 
-See `specs/001-nantes-birds-pipeline/quickstart.md` for step-by-step commands for each scenario.
+Ver `specs/001-nantes-birds-pipeline/quickstart.md` para los comandos paso a paso de cada escenario.
 
-Prerequisites:
-- AWS CLI configured for `eu-west-3`
-- Lambda `birds-inaturalist-ingestion` deployed with env var `BIRDS_S3_BUCKET`
-- S3 bucket with `raw/inaturalist/` prefix
-- SSM parameter `/birds-pipeline/last_successful_run_date` (absent = first run)
-- Athena workgroup + Glue databases (`birds_raw`, `birds_dbt`) created
-- dbt project installed: `pip install dbt-athena-community && cd dbt_birds && dbt deps`
-- For Scenario 6: Power BI Desktop with Amazon Athena ODBC driver
+Requisitos previos:
+- AWS CLI configurado para `eu-west-3`
+- Lambda `birds-inaturalist-ingestion` desplegada con la variable de entorno `BIRDS_S3_BUCKET`
+- Bucket S3 con el prefijo `raw/inaturalist/`
+- Parámetro SSM `/birds-pipeline/last_successful_run_date` (ausente = primera ejecución)
+- Workgroup de Athena + bases de datos de Glue (`birds_raw`, `birds_dbt`) creados
+- Proyecto dbt instalado: `pip install dbt-athena-community && cd dbt_birds && dbt deps`
+- Para el Escenario 6: Power BI Desktop con el driver ODBC de Amazon Athena
 
-Update the table above with pass/fail results as each scenario is validated against the live environment.
+Actualizar la tabla anterior con los resultados (pass/fail) a medida que cada escenario se valide en el entorno real.

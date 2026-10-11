@@ -1,134 +1,140 @@
 <!--
 ## Sync Impact Report
-Generated: 2026-10-10
+Generado: 2026-10-10
 ---
-Version change: [unversioned / blank scaffold] → 1.0.0 (MAJOR — initial ratification)
+Cambio de versión: [sin versión / plantilla vacía] → 1.0.0 (MAJOR — ratificación inicial)
 
-Added sections:
-  - Project Vision & Purpose (preamble, before Core Principles)
-  - Core Principles (5 principles — all new):
-      I.   ELT Separation of Concerns
-      II.  Ethical API Ingestion & Rate Limiting
-      III. Zero-Failure Data Quality (NON-NEGOTIABLE)
-      IV.  Least-Privilege Security & Cost Governance
-      V.   Idempotency & Documentation
-  - Technology Stack & Roles (Section 2 — new)
-  - dbt Medallion Modeling Standards (Section 3 — new)
-  - Governance (new)
+Secciones añadidas:
+  - Visión y Propósito del Proyecto (preámbulo, antes de los Principios Fundamentales)
+  - Principios Fundamentales (5 principios — todos nuevos):
+      I.   Separación de Responsabilidades ELT
+      II.  Ingesta Ética de la API y Rate Limiting
+      III. Calidad de Datos con Cero Fallos (NO NEGOCIABLE)
+      IV.  Seguridad de Mínimo Privilegio y Gobierno de Costes
+      V.   Idempotencia y Documentación
+  - Stack Tecnológico y Roles (Sección 2 — nueva)
+  - Estándares de Modelado Medallón en dbt (Sección 3 — nueva)
+  - Gobernanza (nueva)
 
-Modified principles: N/A (initial ratification)
-Removed sections: N/A
+Principios modificados: N/A (ratificación inicial)
+Secciones eliminadas: N/A
 
-Deferred TODOs:
-  - RATIFICATION_DATE set to 2026-10-10 (today). Update if the project was started earlier.
+TODOs aplazados:
+  - RATIFICATION_DATE fijada en 2026-10-10 (hoy). Actualizar si el proyecto empezó antes.
 
-This comment is scratch material for human review. Remove before committing.
+Este comentario es material de trabajo para revisión humana. Eliminar antes de hacer commit.
 -->
 
-# Nantes Biodiversity Analytics Pipeline Constitution
+# Constitución del Pipeline Analítico de Biodiversidad en Nantes
 
-## Project Vision & Purpose
+## Visión y Propósito del Proyecto
 
-Build a scalable, robust, and cost-effective end-to-end Modern Data Stack (MDS) pipeline to
-ingest, clean, model, and visualize citizen science wildlife observations (specifically Aves in
-Nantes, France) from the open-source platform iNaturalist.
+Construir un pipeline Modern Data Stack (MDS) end-to-end, escalable, robusto y eficiente en
+costes para ingestar, limpiar, modelar y visualizar observaciones de fauna de ciencia ciudadana
+(en concreto Aves en Nantes, Francia) procedentes de la plataforma de código abierto iNaturalist.
 
-This pipeline serves as an analytical reference project demonstrating senior Data Engineering
-best practices: Serverless EL (Extract & Load), Analytics Engineering via dbt, and Business
-Intelligence via Power BI.
+Este pipeline sirve como proyecto analítico de referencia que demuestra buenas prácticas de Data
+Engineering de nivel senior: EL Serverless (Extract & Load), Analytics Engineering con dbt y
+Business Intelligence con Power BI.
 
-## Core Principles
+## Principios Fundamentales
 
-### I. ELT Separation of Concerns
+### I. Separación de Responsabilidades ELT
 
-**Ingestion (EL):** AWS Lambda is solely responsible for data extraction and persistence to
-object storage (AWS S3). Lambda MUST NOT perform heavy analytical transformations.
+**Ingesta (EL):** AWS Lambda es la única responsable de la extracción de datos y de su
+persistencia en almacenamiento de objetos (AWS S3). Lambda NO DEBE realizar transformaciones
+analíticas pesadas.
 
-**Storage (Data Lake):** S3 is the single source of truth. Raw data MUST be partitioned
-temporally (`raw/dataset/year=YYYY/month=MM/`).
+**Almacenamiento (Data Lake):** S3 es la única fuente de verdad. Los datos raw DEBEN
+particionarse temporalmente (`raw/dataset/year=YYYY/month=MM/`).
 
-**Transformation (T):** All analytical transformations MUST be executed by dbt using in-place
-SQL on AWS Athena. No row-level processing in Lambda.
+**Transformación (T):** Todas las transformaciones analíticas DEBEN ejecutarse con dbt mediante
+SQL in-place sobre AWS Athena. Sin procesamiento fila a fila en Lambda.
 
-**Serving & BI:** Power BI MUST consume only modeled and curated data marts (`marts/`). Direct
-access to raw or staging layers is prohibited.
+**Serving y BI:** Power BI DEBE consumir únicamente data marts modelados y curados (`marts/`).
+Queda prohibido el acceso directo a las capas raw o de staging.
 
-*Rationale: Keeping ingestion, storage, transformation, and serving concerns cleanly separated
-enables independent scaling, testability, and auditability of each layer.*
+*Justificación: Mantener separadas con claridad la ingesta, el almacenamiento, la transformación
+y el serving permite escalar, probar y auditar cada capa de forma independiente.*
 
-### II. Ethical API Ingestion & Rate Limiting
+### II. Ingesta Ética de la API y Rate Limiting
 
-Ingestion MUST strictly respect iNaturalist API rate limits (~1 request per second).
+La ingesta DEBE respetar estrictamente los rate limits de la API de iNaturalist (~1 petición
+por segundo).
 
-All API calls MUST include an identifiable `User-Agent` header that identifies this project.
+Todas las llamadas a la API DEBEN incluir una cabecera `User-Agent` identificable que
+identifique este proyecto.
 
-Ingestion MUST run on an incremental basis, capturing only newly created or newly observed
-records since the last successful run. Full re-ingestion MUST be explicitly justified and
-gated behind a manual trigger.
+La ingesta DEBE ejecutarse de forma incremental, capturando solo los registros recién creados
+o recién observados desde la última ejecución exitosa. Una re-ingesta completa DEBE estar
+justificada explícitamente y quedar tras un disparo manual.
 
-*Rationale: Responsible use of the iNaturalist public API protects the upstream service and
-the project's continued access to the data.*
+*Justificación: Un uso responsable de la API pública de iNaturalist protege el servicio de
+origen y el acceso continuado del proyecto a los datos.*
 
-### III. Zero-Failure Data Quality (NON-NEGOTIABLE)
+### III. Calidad de Datos con Cero Fallos (NO NEGOCIABLE)
 
-Raw JSON MUST be stored exactly as received (schema-drift tolerant at the raw layer).
+El JSON raw DEBE almacenarse exactamente como se recibe (tolerante al schema drift en la capa raw).
 
-Before promotion to production marts, dbt tests MUST enforce:
-- `observation_id` is unique and non-null (primary key integrity).
-- Latitude and longitude fall within the bounding box of Greater Nantes.
-- `quality_grade` values match iNaturalist taxonomy: `research`, `needs_id`, or `casual`.
+Antes de la promoción a los marts de producción, los tests de dbt DEBEN garantizar:
+- `observation_id` es único y no nulo (integridad de la clave primaria).
+- La latitud y la longitud están dentro del bounding box del Gran Nantes.
+- Los valores de `quality_grade` coinciden con la taxonomía de iNaturalist: `research`,
+  `needs_id` o `casual`.
 
-A dbt model MUST NOT be merged to `main` if any schema test fails.
+Un modelo dbt NO DEBE fusionarse en `main` si falla cualquier test de esquema.
 
-*Rationale: Downstream Power BI dashboards and analytical queries depend on trustworthy data.
-Silent data corruption is worse than a visible pipeline failure.*
+*Justificación: Los dashboards de Power BI y las consultas analíticas posteriores dependen de
+datos fiables. Una corrupción silenciosa de datos es peor que un fallo visible del pipeline.*
 
-### IV. Least-Privilege Security & Cost Governance
+### IV. Seguridad de Mínimo Privilegio y Gobierno de Costes
 
-**IAM:** Lambda execution roles MUST carry only `s3:PutObject` on the target S3 prefix and
-CloudWatch Logs write permissions. No wildcard resource ARNs are permitted.
+**IAM:** Los roles de ejecución de Lambda DEBEN tener solo `s3:PutObject` sobre el prefijo S3
+destino y permisos de escritura en CloudWatch Logs. No se permiten ARNs de recurso comodín.
 
-**Lambda:** Function timeout MUST be capped at 3 minutes.
+**Lambda:** El timeout de la función DEBE limitarse a 3 minutos.
 
-**Athena:** All processed data MUST be stored as Parquet with Snappy compression. Queries MUST
-use partition pruning (`year`, `month` predicates) to keep per-query scan costs near zero.
+**Athena:** Todos los datos procesados DEBEN almacenarse como Parquet con compresión Snappy. Las
+consultas DEBEN usar partition pruning (predicados sobre `year`, `month`) para mantener el coste
+de escaneo por consulta cercano a cero.
 
-*Rationale: The project targets near-zero operating cost. Over-provisioned IAM roles create
-unnecessary security blast radius; unoptimized Athena scans are the primary cost driver.*
+*Justificación: El proyecto apunta a un coste operativo cercano a cero. Los roles IAM
+sobredimensionados amplían innecesariamente la superficie de impacto en seguridad; los escaneos
+de Athena no optimizados son el principal generador de costes.*
 
-### V. Idempotency & Documentation
+### V. Idempotencia y Documentación
 
-**Idempotency:** Any execution of the ingestion Lambda or any dbt run MUST produce the same
-final state regardless of how many times it is re-run. Deduplication MUST be keyed on
+**Idempotencia:** Cualquier ejecución de la Lambda de ingesta o de dbt DEBE producir el mismo
+estado final sin importar cuántas veces se re-ejecute. La deduplicación DEBE basarse en
 `observation_id`.
 
-**Documentation:** Every dbt model and every column MUST be documented in its companion `.yml`
-file with at least one dbt test attached. A PR that adds or modifies a model without updating
-its `.yml` MUST NOT be merged to `main`.
+**Documentación:** Cada modelo dbt y cada columna DEBEN documentarse en su archivo `.yml`
+asociado con al menos un test de dbt. Un PR que añada o modifique un modelo sin actualizar su
+`.yml` NO DEBE fusionarse en `main`.
 
-*Rationale: Idempotency makes the pipeline safe to retry after failures without manual
-cleanup. Mandatory documentation ensures the project remains legible as a reference
-implementation.*
+*Justificación: La idempotencia permite reintentar el pipeline tras un fallo sin limpieza
+manual. La documentación obligatoria garantiza que el proyecto siga siendo legible como
+implementación de referencia.*
 
-## Technology Stack & Roles
+## Stack Tecnológico y Roles
 
-| Layer | Technology | Primary Function |
+| Capa | Tecnología | Función Principal |
 | :--- | :--- | :--- |
-| **Ingestion Engine** | AWS Lambda (Python 3.11+) | Serverless incremental API consumer |
-| **Scheduler** | Amazon EventBridge | Cron orchestration for periodic ingestion |
-| **Storage / Lake** | AWS S3 | Raw zone (JSON) and Processed zone (Parquet) |
-| **Catalog & Schema** | AWS Glue Data Catalog | Metadata crawler and table definitions |
-| **Compute Engine** | AWS Athena | Serverless distributed SQL query engine |
-| **Transformation** | dbt-core / dbt-athena | Lineage, modeling, testing, documentation |
-| **Visualization** | Power BI Desktop / Service | Dashboards, geospatial maps, taxonomic trends |
-| **IaC & CI/CD** | Terraform & GitHub Actions | Reproducible infrastructure, automated dbt tests |
+| **Motor de Ingesta** | AWS Lambda (Python 3.11+) | Consumidor incremental serverless de la API |
+| **Programador** | Amazon EventBridge | Orquestación cron de la ingesta periódica |
+| **Almacenamiento / Lake** | AWS S3 | Zona raw (JSON) y zona procesada (Parquet) |
+| **Catálogo y Esquema** | AWS Glue Data Catalog | Crawler de metadatos y definiciones de tablas |
+| **Motor de Cómputo** | AWS Athena | Motor SQL distribuido serverless |
+| **Transformación** | dbt-core / dbt-athena | Linaje, modelado, tests, documentación |
+| **Visualización** | Power BI Desktop / Service | Dashboards, mapas geoespaciales, tendencias taxonómicas |
+| **IaC y CI/CD** | Terraform y GitHub Actions | Infraestructura reproducible, tests dbt automatizados |
 
-Any change to the technology stack MUST be recorded as a constitution amendment (MINOR bump
-minimum) before implementation begins.
+Cualquier cambio en el stack tecnológico DEBE registrarse como enmienda de la constitución
+(como mínimo incremento MINOR) antes de empezar la implementación.
 
-## dbt Medallion Modeling Standards
+## Estándares de Modelado Medallón en dbt
 
-All dbt models MUST adhere to the following three-layer medallion architecture:
+Todos los modelos dbt DEBEN seguir la siguiente arquitectura medallón de tres capas:
 
 ```
 raw_inaturalist (S3 / Athena External Table)
@@ -147,34 +153,35 @@ fct_observations.sql               dim_species.sql
   (Marts: star schema for Power BI analytical querying)
 ```
 
-**Staging (`stg_`):** 1:1 mapping with the raw source. Type casting, uniform snake_case column
-naming, and preliminary deduplication only. No business logic permitted here.
+**Staging (`stg_`):** Mapeo 1:1 con la fuente raw. Solo casteo de tipos, nombres de columna
+uniformes en snake_case y deduplicación preliminar. No se permite lógica de negocio.
 
-**Intermediate (`int_`):** Joins between staging models and business logic (e.g., categorizing
-observation times into daylight periods, spatial enrichment). No direct raw source references.
+**Intermedia (`int_`):** Joins entre modelos de staging y lógica de negocio (p. ej.,
+clasificación de las horas de observación en franjas del día, enriquecimiento espacial). Sin
+referencias directas a la fuente raw.
 
-**Marts (`fct_`, `dim_`):** Dimensional star schema optimized for fast Power BI querying.
-Power BI MUST reference only this layer.
+**Marts (`fct_`, `dim_`):** Esquema estrella dimensional optimizado para consultas rápidas desde
+Power BI. Power BI DEBE referenciar únicamente esta capa.
 
-Skipping a layer (e.g., staging directly to mart) is prohibited without an explicit
-constitution amendment.
+Saltarse una capa (p. ej., de staging directamente a marts) está prohibido sin una enmienda
+explícita de la constitución.
 
-## Governance
+## Gobernanza
 
-This constitution supersedes all other project practices and conventions. In case of conflict
-between this document and any other guideline, this document takes precedence.
+Esta constitución prevalece sobre cualquier otra práctica o convención del proyecto. En caso de
+conflicto entre este documento y cualquier otra directriz, prevalece este documento.
 
-**Amendment Procedure:**
-1. Open a PR modifying `.specify/memory/constitution.md`.
-2. Increment the version following semantic versioning:
-   - **MAJOR:** Backward-incompatible removal or redefinition of an existing principle.
-   - **MINOR:** New principle, new section, or materially expanded guidance.
-   - **PATCH:** Clarifications, wording fixes, non-semantic refinements.
-3. The PR description MUST explain the rationale for the amendment.
-4. At least one reviewer MUST approve before merging to `main`.
+**Procedimiento de Enmienda:**
+1. Abrir un PR que modifique `.specify/memory/constitution.md`.
+2. Incrementar la versión siguiendo el versionado semántico:
+   - **MAJOR:** Eliminación o redefinición incompatible de un principio existente.
+   - **MINOR:** Nuevo principio, nueva sección o ampliación sustancial de las directrices.
+   - **PATCH:** Aclaraciones, correcciones de redacción, refinamientos no semánticos.
+3. La descripción del PR DEBE explicar la justificación de la enmienda.
+4. Al menos un revisor DEBE aprobarlo antes del merge en `main`.
 
-**Compliance:** All PRs MUST be reviewed for compliance with this constitution before merging.
-Complexity added beyond what a feature requires MUST be explicitly justified against the
-principles above.
+**Cumplimiento:** Todos los PRs DEBEN revisarse para verificar el cumplimiento de esta
+constitución antes del merge. Cualquier complejidad añadida más allá de lo que requiere un
+feature DEBE justificarse explícitamente frente a los principios anteriores.
 
 **Version**: 1.0.0 | **Ratified**: 2026-10-10 | **Last Amended**: 2026-10-10

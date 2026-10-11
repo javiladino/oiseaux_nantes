@@ -1,22 +1,22 @@
-# Power BI Reports
+# Informes de Power BI
 
 ## nantes_birds.pbix
 
-This directory holds the Power BI report file for the Nantes Birds Biodiversity Pipeline.
+Este directorio contiene el archivo de informe de Power BI del Pipeline de Biodiversidad de Aves en Nantes.
 
-The `.pbix` file is a binary artifact that must be created and configured using **Power BI Desktop**. Follow the setup guide at [`docs/powerbi-setup.md`](../docs/powerbi-setup.md) to:
+El archivo `.pbix` es un artefacto binario que debe crearse y configurarse con **Power BI Desktop**. Seguir la guía de configuración en [`docs/powerbi-setup.md`](../docs/powerbi-setup.md) para:
 
-1. Connect to Athena via ODBC DSN (`AthenaNantesBirds`, schema `birds_dbt`)
-2. Import the four mart tables: `fct_observations`, `dim_species`, `dim_users`, `dim_date`
-3. Configure star schema relationships in Model view
-4. Build the three required visuals:
-   - Geospatial map (latitude/longitude from `fct_observations`, species filter slicer)
-   - Seasonal trend bar chart (monthly counts coloured by `biological_season`)
-   - Ranking table with DAX measures (`Total Observations`, `Distinct Species`, `Research Grade %`)
-5. Save as `reports/nantes_birds.pbix` and commit the binary
-6. Publish to Power BI Service and configure daily scheduled refresh
+1. Conectarse a Athena mediante el DSN ODBC (`AthenaNantesBirds`, esquema `birds_dbt`)
+2. Importar las cuatro tablas de marts: `fct_observations`, `dim_species`, `dim_users`, `dim_date`
+3. Configurar las relaciones del esquema estrella en la vista Model
+4. Construir los tres visuales requeridos:
+   - Mapa geoespacial (latitud/longitud de `fct_observations`, segmentador de especie)
+   - Gráfico de barras de tendencia estacional (recuentos mensuales coloreados por `biological_season`)
+   - Tabla de ranking con medidas DAX (`Total Observations`, `Distinct Species`, `Research Grade %`)
+5. Guardarlo como `reports/nantes_birds.pbix` y hacer commit del binario
+6. Publicarlo en Power BI Service y configurar la actualización programada diaria
 
-### DAX Measures
+### Medidas DAX
 
 ```dax
 Total Observations = COUNTROWS(fct_observations)
@@ -30,10 +30,10 @@ Research Grade % =
     )
 ```
 
-### Star Schema Relationships
+### Relaciones del Esquema Estrella
 
-| From | Column | To | Column | Cardinality |
-|------|--------|-----|--------|-------------|
+| Desde | Columna | Hacia | Columna | Cardinalidad |
+|-------|---------|-------|---------|--------------|
 | fct_observations | species_key | dim_species | species_key | Many-to-One |
 | fct_observations | user_key | dim_users | user_key | Many-to-One |
 | fct_observations | date_key | dim_date | date_key | Many-to-One |
