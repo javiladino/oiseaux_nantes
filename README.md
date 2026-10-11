@@ -98,6 +98,9 @@ y [contracts/dbt-models.md](specs/001-nantes-birds-pipeline/contracts/dbt-models
 
 ## Puesta en Marcha
 
+> Para un despliegue completo desde cero en AWS, seguir el
+> [instructivo de despliegue](docs/despliegue-aws.md) paso a paso.
+
 ### Requisitos
 
 - Python 3.11+ (ingesta) y Python 3.12 (Airflow)
@@ -184,6 +187,7 @@ estrella, los tres visuales (mapa, tendencia estacional, ranking) y las medidas 
 - [Orquestación con Airflow — spec](specs/002-airflow-orchestration/spec.md) ·
   [plan](specs/002-airflow-orchestration/plan.md) ·
   [tareas](specs/002-airflow-orchestration/tasks.md)
+- [Instructivo de despliegue en AWS](docs/despliegue-aws.md)
 - [Operación de Airflow](docs/airflow-operations.md)
 
 ## Datos y Licencia
