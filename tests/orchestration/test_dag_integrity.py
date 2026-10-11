@@ -16,11 +16,11 @@ MODELS = [
 ]
 
 
-def run_id(model):
+def _run(model):
     return f"{GROUP}.{model}.run"
 
 
-def test_id(model):
+def _test(model):
     return f"{GROUP}.{model}.test"
 
 
@@ -33,8 +33,9 @@ def test_no_import_errors(dagbag):
 
 def test_identity_and_schedule(dag):
     assert dag.dag_id == "nantes_birds_pipeline"
-    assert dag.timetable.summary == "0 5 * * *"
-    assert str(dag.timezone) in {"UTC", "Timezone('UTC')"}
+    timetable = dag.timetable.serialize()
+    assert timetable["expression"] == "0 5 * * *"
+    assert timetable["timezone"] == "UTC"
     assert dag.catchup is False
     assert dag.max_active_runs == 1
 
@@ -48,9 +49,9 @@ def test_ingest_task_is_root(dag):
 
 @pytest.mark.parametrize("model", MODELS)
 def test_each_model_has_run_and_test(dag, model):
-    assert dag.has_task(run_id(model))
-    assert dag.has_task(test_id(model))
-    assert run_id(model) in dag.get_task(test_id(model)).upstream_task_ids
+    assert dag.has_task(_run(model))
+    assert dag.has_task(_test(model))
+    assert _run(model) in dag.get_task(_test(model)).upstream_task_ids
 
 
 def test_every_dbt_task_depends_on_ingestion(dag):
@@ -61,16 +62,16 @@ def test_every_dbt_task_depends_on_ingestion(dag):
 
 
 def test_model_order_follows_tests(dag):
-    int_run = dag.get_task(run_id("int_observations__geospatial_enriched"))
-    assert test_id("stg_inaturalist__observations") in int_run.upstream_task_ids
+    int_run = dag.get_task(_run("int_observations__geospatial_enriched"))
+    assert _test("stg_inaturalist__observations") in int_run.upstream_task_ids
 
     for dim in ("dim_species", "dim_users", "dim_date"):
-        dim_run = dag.get_task(run_id(dim))
-        assert test_id("int_observations__geospatial_enriched") in dim_run.upstream_task_ids
+        dim_run = dag.get_task(_run(dim))
+        assert _test("int_observations__geospatial_enriched") in dim_run.upstream_task_ids
 
-    fct_upstream = dag.get_task(run_id("fct_observations")).get_flat_relative_ids(upstream=True)
+    fct_upstream = dag.get_task(_run("fct_observations")).get_flat_relative_ids(upstream=True)
     for dim in ("dim_species", "dim_users", "dim_date"):
-        assert test_id(dim) in fct_upstream
+        assert _test(dim) in fct_upstream
 
 
 def test_no_tasks_outside_contract(dag):
@@ -110,5 +111,5 @@ def test_full_refresh_only_on_dbt_runs(dag):
         assert "full_refresh" not in str(getattr(ingest, field, ""))
 
     for model in MODELS:
-        task = dag.get_task(run_id(model))
+        task = dag.get_task(_run(model))
         assert task.full_refresh == "{{ params.full_refresh }}"
