@@ -1,0 +1,34 @@
+# Plantilla de airflow.cfg para la EC2 (t3.small, 2 GB de RAM).
+# install_airflow.sh la renderiza con envsubst sustituyendo solo ${AIRFLOW_DB_PASSWORD}.
+# Los secretos (fernet_key, jwt_secret, secret_key) llegan por variables de entorno
+# AIRFLOW__<SECCION>__<CLAVE> desde /etc/airflow/airflow.env, nunca desde este archivo.
+
+[core]
+executor = LocalExecutor
+dags_folder = /opt/oiseaux_nantes/orchestration/dags
+plugins_folder = /opt/oiseaux_nantes/orchestration/plugins
+load_examples = False
+# El DAG nace pausado para no convivir con la regla de EventBridge hasta el paso a producción (T022).
+dags_are_paused_at_creation = True
+parallelism = 4
+max_active_tasks_per_dag = 4
+max_active_runs_per_dag = 1
+default_timezone = utc
+# Auth manager por defecto de Airflow 3 (SimpleAuthManager). La contraseña se genera en
+# $AIRFLOW_HOME/simple_auth_manager_passwords.json.generated
+simple_auth_manager_users = admin:admin
+
+[database]
+sql_alchemy_conn = postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD}@localhost:5432/airflow
+
+[api]
+# Solo escucha en local: se accede con el túnel de Session Manager.
+host = 127.0.0.1
+port = 8080
+workers = 1
+
+[dag_processor]
+refresh_interval = 300
+
+[logging]
+base_log_folder = /opt/airflow/logs

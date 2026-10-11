@@ -51,6 +51,17 @@ aws cloudwatch put-metric-alarm \
 
 ## Regla Cron Diaria de EventBridge (T039)
 
+> **Desactivada desde la feature 002.** Airflow dispara ahora la Lambda (ver
+> [Orquestación con Airflow](#orquestación-con-airflow-feature-002)). La regla y su permiso de
+> invocación se conservan para poder revertir:
+>
+> ```bash
+> aws events enable-rule --name birds-ingestion-daily --region eu-west-3   # revertir
+> aws events disable-rule --name birds-ingestion-daily --region eu-west-3  # estado actual
+> ```
+>
+> Nunca deben estar activos a la vez la regla y el DAG `nantes_birds_pipeline`.
+
 La Lambda se dispara a diario mediante una regla de Amazon EventBridge. El cron está programado
 para ejecutarse antes de la actualización programada de Power BI (que se ejecuta a las 08:00
 UTC) — Lambda se ejecuta a diario a las **05:00 UTC**.
@@ -119,3 +130,57 @@ aws lambda add-permission \
 ```
 
 Sin ARNs de recurso comodín (constitución IV).
+
+---
+
+## Orquestación con Airflow (feature 002)
+
+Airflow 3.3 se ejecuta en una instancia EC2 t3.small definida con Terraform en `infra/airflow/`.
+La operación diaria (acceso, despliegue, ejecuciones manuales) está en
+[docs/airflow-operations.md](airflow-operations.md).
+
+### Despliegue
+
+```bash
+cd infra/airflow
+terraform init
+terraform apply -var bucket_name=<bucket>
+```
+
+Terraform crea:
+
+| Recurso | Nombre | Notas |
+|---------|--------|-------|
+| Instancia EC2 | `birds-airflow` | Amazon Linux 2023, gp3 20 GB cifrado, IMDSv2 obligatorio; `user_data` = `orchestration/bootstrap/install_airflow.sh` |
+| Security group | `birds-airflow-sg` | **Sin reglas de entrada**; salida solo HTTPS 443 |
+| Rol IAM + instance profile | `birds-airflow-ec2-role` / `birds-airflow-ec2-profile` | Sin claves estáticas |
+
+El bootstrap instala PostgreSQL 16 (metadatos), dos virtualenvs (`/opt/airflow-venv` y
+`/opt/dbt-venv`), clona el repositorio en `/opt/oiseaux_nantes` y arranca tres servicios
+systemd: `airflow-api-server`, `airflow-scheduler` y `airflow-dag-processor`. El progreso queda
+en `/var/log/airflow-bootstrap.log`.
+
+### Permisos IAM del rol de Airflow
+
+Definidos en `infra/airflow/iam.tf` según
+[specs/002-airflow-orchestration/contracts/iam-policy.md](../specs/002-airflow-orchestration/contracts/iam-policy.md):
+
+- `lambda:InvokeFunction` solo sobre `birds-inaturalist-ingestion`.
+- Athena sobre el workgroup `primary`; Glue sobre las bases `birds_raw` y `birds_dbt`.
+- S3: lectura de `raw/inaturalist/observations/*`; lectura y escritura de `processed/*` y
+  `athena-results/*`. **Sin** escritura en `raw/` (solo la Lambda escribe ahí).
+- `sns:Publish` sobre `birds-pipeline-alerts`.
+- **Sin** permisos sobre SSM Parameter Store: el watermark es exclusivo de la Lambda.
+- Política gestionada `AmazonSSMManagedInstanceCore` para Session Manager (excepción justificada
+  en la constitución IV: sus acciones no admiten permisos por recurso).
+
+### Coste estimado
+
+| Recurso | Coste mensual aprox. (eu-west-3) |
+|---------|----------------------------------|
+| t3.small 24/7 | ~17 USD |
+| EBS gp3 20 GB | ~2 USD |
+| **Total** | **~19 USD** |
+
+Todos los recursos llevan las etiquetas `project = oiseaux-nantes` y `component = airflow` para
+filtrarlos en Cost Explorer.

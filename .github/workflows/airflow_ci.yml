@@ -1,0 +1,46 @@
+name: Airflow CI
+
+on:
+  pull_request:
+    paths:
+      - "orchestration/**"
+      - "dbt_birds/**"
+      - "tests/orchestration/**"
+      - ".github/workflows/airflow_ci.yml"
+
+jobs:
+  dag-integrity:
+    runs-on: ubuntu-latest
+    env:
+      # sources.yml exige esta variable; dbt parse no se conecta a AWS.
+      BIRDS_S3_BUCKET: ci-placeholder
+      AIRFLOW_CONSTRAINTS: https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Airflow, Cosmos and providers
+        run: pip install -r orchestration/requirements.txt --constraint "$AIRFLOW_CONSTRAINTS"
+
+      - name: Install test dependencies
+        run: pip install -r tests/requirements-dev.txt --constraint "$AIRFLOW_CONSTRAINTS"
+
+      # dbt en un virtualenv separado, como en la EC2, para no alterar las dependencias de Airflow.
+      - name: Install dbt (separate virtualenv)
+        run: |
+          python -m venv "$RUNNER_TEMP/dbt-venv"
+          "$RUNNER_TEMP/dbt-venv/bin/pip" install dbt-athena-community
+          echo "DBT_EXECUTABLE_PATH=$RUNNER_TEMP/dbt-venv/bin/dbt" >> "$GITHUB_ENV"
+
+      - name: Generate dbt manifest
+        working-directory: dbt_birds
+        run: |
+          "$DBT_EXECUTABLE_PATH" deps
+          "$DBT_EXECUTABLE_PATH" parse --profiles-dir ../orchestration/config --target ci
+
+      - name: DAG integrity tests
+        run: pytest tests/orchestration/ -v

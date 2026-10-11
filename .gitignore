@@ -30,3 +30,5 @@ dbt_birds/logs/
 *.tfstate
 *.tfstate.backup
 .terraform/
+infra/airflow/*.tfvars
+infra/airflow/.terraform/

@@ -1,0 +1,9 @@
+# Instalar SIEMPRE con el archivo de constraints oficial de Airflow:
+#   pip install -r orchestration/requirements.txt \
+#     --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
+#
+# dbt NO va aquí: vive en un virtualenv separado (/opt/dbt-venv) para evitar conflictos
+# de dependencias con Airflow (ver specs/002-airflow-orchestration/research.md §3).
+apache-airflow[postgres]==3.3.2
+apache-airflow-providers-amazon
+astronomer-cosmos~=1.15

@@ -1,7 +1,11 @@
 # Cartografía del Sistema — Pipeline de Aves de Nantes
 
 Este documento describe la arquitectura del pipeline con diagramas Mermaid: la vista general de
-componentes, el flujo de ingesta, el linaje de dbt, el modelo dimensional y la CI.
+componentes, el flujo de ingesta, el DAG de orquestación, el linaje de dbt, el modelo
+dimensional y la CI.
+
+Desde la feature `002-airflow-orchestration`, Apache Airflow (en una EC2) orquesta la ingesta y
+la transformación; la regla de EventBridge queda desactivada.
 
 ---
 
@@ -15,7 +19,10 @@ flowchart LR
 
     subgraph AWS["AWS · eu-west-3"]
         direction LR
-        EB["EventBridge<br/>cron(0 5 * * ? *)"]
+        subgraph ORCH["Orquestación · orchestration/ · infra/airflow/"]
+            AF["Airflow 3.3 en EC2 t3.small<br/>DAG nantes_birds_pipeline<br/>05:00 UTC · LocalExecutor"]
+        end
+        EB["EventBridge<br/>birds-ingestion-daily<br/>(DESACTIVADA)"]
 
         subgraph ING["Ingesta (EL) · ingestion/"]
             LAMBDA["Lambda<br/>birds-inaturalist-ingestion<br/>handler.py"]
@@ -48,7 +55,10 @@ flowchart LR
 
     MAIL(["Email del responsable"])
 
-    EB -->|"dispara 05:00 UTC"| LAMBDA
+    AF -->|"1 · invoca (RequestResponse)"| LAMBDA
+    AF -->|"2 · dbt run/test por modelo (Cosmos)"| DBTCORE
+    AF -.->|"fallo o retraso"| SNS
+    EB -.->|"solo para revertir"| LAMBDA
     LAMBDA <-->|"get / put watermark"| SSM
     LAMBDA -->|"HTTPS · ~1 req/s · cursor id_above"| INAT
     LAMBDA -->|"PutObject JSON crudo"| RAW
@@ -65,8 +75,8 @@ flowchart LR
     PBI -->|"ODBC Simba · DSN AthenaNantesBirds<br/>solo esquema marts"| ATHENA
 ```
 
-**Separación de responsabilidades (constitución I):** Lambda solo extrae y carga (EL), dbt
-transforma (T) dentro de Athena y Power BI lee únicamente la capa `marts`.
+**Separación de responsabilidades (constitución I):** Airflow solo orquesta, Lambda solo extrae
+y carga (EL), dbt transforma (T) dentro de Athena y Power BI lee únicamente la capa `marts`.
 
 ---
 
@@ -75,7 +85,7 @@ transforma (T) dentro de Athena y Power BI lee únicamente la capa `marts`.
 ```mermaid
 sequenceDiagram
     autonumber
-    participant EB as EventBridge
+    participant EB as Airflow (DAG nantes_birds_pipeline)
     participant L as Lambda (handler.py)
     participant SSM as SSM Parameter Store
     participant API as API iNaturalist
@@ -106,6 +116,29 @@ sequenceDiagram
 
     Note over L,SSM: Ante cualquier fallo, el watermark NO se actualiza →<br/>la siguiente ejecución retoma desde el mismo punto (idempotencia)
 ```
+
+---
+
+## 2b. DAG de Orquestación (`nantes_birds_pipeline`)
+
+```mermaid
+flowchart LR
+    I["ingest_inaturalist<br/>Lambda · RequestResponse"] --> STG["stg_inaturalist__observations<br/>run → test"]
+    STG --> INT["int_observations__geospatial_enriched<br/>run → test (incluye bbox)"]
+    INT --> DS["dim_species<br/>run → test"]
+    INT --> DU["dim_users<br/>run → test"]
+    INT --> DD["dim_date<br/>run → test"]
+    DS --> F["fct_observations<br/>run → test"]
+    DU --> F
+    DD --> F
+```
+
+- Diario a las 05:00 UTC, una sola ejecución activa, sin ejecuciones atrasadas (`catchup=False`).
+- Cada tarea se reintenta 2 veces (5 min). Si falla definitivamente, las dependientes quedan en
+  `upstream_failed` y se envía un email por SNS.
+- Si la ejecución no ha terminado a las 07:00 UTC, se envía una alerta de retraso.
+- Parámetro `full_refresh` (disparo manual): reconstruye los modelos dbt; la ingesta no cambia.
+- Contrato completo: [specs/002-airflow-orchestration/contracts/dag-interface.md](../specs/002-airflow-orchestration/contracts/dag-interface.md).
 
 ---
 
@@ -224,6 +257,12 @@ flowchart LR
 | `ssm_watermark.py` | `ingestion/` | Lectura/escritura atómica del watermark |
 | Tests unitarios / integración | `tests/` | pytest + moto; test real contra la API |
 | Proyecto dbt | `dbt_birds/` | Fuentes, modelos medallón, tests |
-| CI | `.github/workflows/dbt_ci.yml` | `dbt compile` + `dbt test` en cada PR |
-| Infraestructura | `docs/infrastructure.md` | EventBridge, CloudWatch, SNS, IAM (vía AWS CLI) |
+| DAG de Airflow | `orchestration/dags/` | Encadena ingesta → dbt con reintentos, alertas y `full_refresh` |
+| Alertas de Airflow | `orchestration/plugins/alerts.py` | Mensajes de fallo y retraso hacia SNS |
+| Despliegue de Airflow | `orchestration/bootstrap/`, `orchestration/deploy/`, `orchestration/systemd/` | Instalación en la EC2, `git pull` + `dbt parse`, servicios |
+| Infraestructura de Airflow | `infra/airflow/` | Terraform: EC2, IAM, security group |
+| Tests del DAG | `tests/orchestration/` | Integridad del DAG, tarea de ingesta, alertas |
+| CI | `.github/workflows/dbt_ci.yml`, `.github/workflows/airflow_ci.yml` | `dbt compile` + `dbt test`; integridad del DAG en cada PR |
+| Infraestructura | `docs/infrastructure.md` | EventBridge (desactivada), CloudWatch, SNS, IAM (vía AWS CLI) |
+| Operación de Airflow | `docs/airflow-operations.md` | Acceso, despliegue, ejecuciones manuales, recuperación |
 | Power BI | `reports/`, `docs/powerbi-setup.md` | Conexión ODBC, relaciones, visuales y medidas DAX |

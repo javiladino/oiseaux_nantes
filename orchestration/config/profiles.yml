@@ -1,0 +1,22 @@
+# Perfil dbt usado por Airflow (Cosmos) y por deploy.sh.
+# - prod: ejecución real en la EC2 (credenciales del instance profile).
+# - ci:   valores ficticios; solo para `dbt parse` sin conexión a AWS (CI y tests locales).
+birds_pipeline:
+  target: prod
+  outputs:
+    prod:
+      type: athena
+      region_name: eu-west-3
+      database: awsdatacatalog
+      schema: birds_dbt
+      threads: 4
+      s3_staging_dir: "s3://{{ env_var('BIRDS_S3_BUCKET') }}/athena-results/"
+      s3_data_dir: "s3://{{ env_var('BIRDS_S3_BUCKET') }}/processed/"
+    ci:
+      type: athena
+      region_name: eu-west-3
+      database: awsdatacatalog
+      schema: birds_dbt
+      threads: 1
+      s3_staging_dir: "s3://ci-placeholder/athena-results/"
+      s3_data_dir: "s3://ci-placeholder/processed/"
