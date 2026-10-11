@@ -103,9 +103,10 @@ aws s3 ls s3://{bucket}/raw/inaturalist/observations/ --recursive | wc -l
 ### Pasos
 
 ```bash
-# 1. Registrar la tabla raw externa (una sola vez, cuando ya existan datos raw)
+# 1. Crear la tabla raw externa (idempotente; usa partition projection, así que las
+#    particiones de cada mes son visibles sin registrarlas)
 cd dbt_birds
-dbt run-operation stage_external_sources
+BIRDS_S3_BUCKET=<bucket> dbt run-operation create_raw_observations_table
 
 # 2. Ejecutar el modelo de staging
 dbt run --select stg_inaturalist__observations

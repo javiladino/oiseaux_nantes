@@ -42,7 +42,7 @@ pip install -r tests/requirements-dev.txt \
   --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
 python -m venv /tmp/dbt-venv && /tmp/dbt-venv/bin/pip install dbt-athena-community   # dbt aparte, como en la EC2
 export DBT_EXECUTABLE_PATH=/tmp/dbt-venv/bin/dbt
-export BIRDS_S3_BUCKET=ci-placeholder   # sources.yml exige esta variable
+export BIRDS_S3_BUCKET=ci-placeholder   # valor ficticio; dbt parse no se conecta a AWS
 cd dbt_birds && $DBT_EXECUTABLE_PATH deps \
   && $DBT_EXECUTABLE_PATH parse --profiles-dir ../orchestration/config --target ci && cd ..
 pytest tests/orchestration/ -v

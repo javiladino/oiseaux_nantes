@@ -60,7 +60,7 @@ Detalle completo en la [constitución del proyecto](.specify/memory/constitution
 | Estado incremental | AWS SSM Parameter Store |
 | Data Lake | AWS S3 (raw JSON / procesado Parquet) |
 | Catálogo y cómputo | AWS Glue Data Catalog + AWS Athena |
-| Transformación | dbt-core + dbt-athena, `dbt_utils`, `dbt_external_tables` |
+| Transformación | dbt-core + dbt-athena, `dbt_utils` |
 | Visualización | Power BI Desktop / Service |
 | CI | GitHub Actions |
 | Alertas | Callbacks de Airflow + CloudWatch Alarms → SNS |
@@ -152,7 +152,7 @@ pytest tests/orchestration/ -v
 pip install dbt-athena-community
 cd dbt_birds
 dbt deps
-dbt run-operation stage_external_sources   # una vez, cuando ya existan datos raw
+BIRDS_S3_BUCKET=<bucket> dbt run-operation create_raw_observations_table   # tabla raw (idempotente)
 dbt run --full-refresh                     # primera ejecución
 dbt test
 ```
