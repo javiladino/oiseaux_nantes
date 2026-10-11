@@ -33,9 +33,8 @@ def test_no_import_errors(dagbag):
 
 def test_identity_and_schedule(dag):
     assert dag.dag_id == "nantes_birds_pipeline"
-    timetable = dag.timetable.serialize()
-    assert timetable["expression"] == "0 5 * * *"
-    assert timetable["timezone"] == "UTC"
+    assert dag.schedule == "0 5 * * *"
+    assert str(dag.timezone) in {"UTC", "Timezone('UTC')"}
     assert dag.catchup is False
     assert dag.max_active_runs == 1
 
