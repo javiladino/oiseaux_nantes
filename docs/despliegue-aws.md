@@ -42,7 +42,7 @@ proyecto, el pipeline completo: ingesta (feature 001) y orquestación con Airflo
 | AWS CLI v2 | `aws --version` | Con un perfil con permisos de administrador sobre la cuenta |
 | Session Manager plugin | `session-manager-plugin --version` | `brew install --cask session-manager-plugin` |
 | Terraform ≥ 1.6 | `terraform version` | |
-| Python 3.11+ | `python3 --version` | Para empaquetar la Lambda y la carga inicial |
+| Python 3.11–3.13 | `python3.13 --version` | Para empaquetar la Lambda y la carga inicial. Evitar 3.14.4 de Homebrew: su `ensurepip` falla al crear entornos virtuales |
 | GitHub CLI | `gh auth status` | Solo para fusionar el PR |
 | Espacio en disco | `df -h .` | **Al menos 1,5 GB libres**: el provider de AWS de Terraform ocupa ~700 MB |
 
@@ -52,13 +52,15 @@ Todos los comandos de esta guía usan estas variables. Ejecútalas en la termina
 trabajar (y otra vez si abres una nueva):
 
 ```bash
+export AWS_PROFILE=<tu-perfil>                    # perfil de AWS CLI con permisos de administrador
 export AWS_REGION=eu-west-3
 export AWS_DEFAULT_REGION=eu-west-3
 export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 export BUCKET=oiseaux-nantes-$ACCOUNT_ID          # el nombre de bucket debe ser único en todo S3
 export ALERT_EMAIL=<tu-email>                     # recibirá las alertas del pipeline
-export TOPIC_ARN=arn:aws:sns:$AWS_REGION:$ACCOUNT_ID:birds-pipeline-alerts
+export TOPIC_ARN=arn:aws:sns:${AWS_REGION}:${ACCOUNT_ID}:birds-pipeline-alerts
 export REPO=$(git rev-parse --show-toplevel)       # ejecutar desde dentro del repositorio
+export AWS_PAGER=""                               # evita que la salida de AWS CLI se quede en el paginador
 
 echo "Cuenta: $ACCOUNT_ID  Bucket: $BUCKET"
 ```
@@ -134,9 +136,9 @@ aws iam put-role-policy --role-name birds-ingestion-lambda-role \
       {\"Sid\": \"S3WriteRawObservations\", \"Effect\": \"Allow\", \"Action\": \"s3:PutObject\",
        \"Resource\": \"arn:aws:s3:::$BUCKET/raw/inaturalist/observations/*\"},
       {\"Sid\": \"SSMWatermark\", \"Effect\": \"Allow\", \"Action\": [\"ssm:GetParameter\", \"ssm:PutParameter\"],
-       \"Resource\": \"arn:aws:ssm:$AWS_REGION:$ACCOUNT_ID:parameter/birds-pipeline/last_successful_run_date\"},
+       \"Resource\": \"arn:aws:ssm:${AWS_REGION}:${ACCOUNT_ID}:parameter/birds-pipeline/last_successful_run_date\"},
       {\"Sid\": \"CloudWatchLogs\", \"Effect\": \"Allow\", \"Action\": [\"logs:CreateLogGroup\", \"logs:CreateLogStream\", \"logs:PutLogEvents\"],
-       \"Resource\": \"arn:aws:logs:$AWS_REGION:$ACCOUNT_ID:log-group:/aws/lambda/birds-inaturalist-ingestion:*\"}
+       \"Resource\": \"arn:aws:logs:${AWS_REGION}:${ACCOUNT_ID}:log-group:/aws/lambda/birds-inaturalist-ingestion:*\"}
     ]
   }"
 ```
@@ -155,7 +157,7 @@ sleep 10   # el rol IAM tarda unos segundos en propagarse
 
 aws lambda create-function --function-name birds-inaturalist-ingestion \
   --runtime python3.12 --handler handler.lambda_handler \
-  --role arn:aws:iam::$ACCOUNT_ID:role/birds-ingestion-lambda-role \
+  --role arn:aws:iam::${ACCOUNT_ID}:role/birds-ingestion-lambda-role \
   --zip-file fileb://$REPO/lambda.zip \
   --timeout 180 --memory-size 512 \
   --environment "Variables={BIRDS_S3_BUCKET=$BUCKET}"
@@ -191,11 +193,11 @@ Airflow será el único programador. Si quieres tener disponible la vía de reve
 aws events put-rule --name birds-ingestion-daily \
   --schedule-expression "cron(0 5 * * ? *)" --state DISABLED
 aws events put-targets --rule birds-ingestion-daily \
-  --targets "Id"="1","Arn"="arn:aws:lambda:$AWS_REGION:$ACCOUNT_ID:function:birds-inaturalist-ingestion"
+  --targets "Id"="1","Arn"="arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:birds-inaturalist-ingestion"
 aws lambda add-permission --function-name birds-inaturalist-ingestion \
   --statement-id eventbridge-daily --action lambda:InvokeFunction \
   --principal events.amazonaws.com \
-  --source-arn arn:aws:events:$AWS_REGION:$ACCOUNT_ID:rule/birds-ingestion-daily
+  --source-arn arn:aws:events:${AWS_REGION}:${ACCOUNT_ID}:rule/birds-ingestion-daily
 ```
 
 ---
@@ -212,7 +214,8 @@ de tiempo, con tus credenciales. Escribe el histórico en S3 y guarda el waterma
 ahí la Lambda solo descarga lo nuevo de cada día.
 
 ```bash
-python3 -m venv /tmp/ingest-venv
+# Python 3.11–3.13. El Python 3.14.4 de Homebrew crea entornos virtuales sin pip (ensurepip falla).
+python3.13 -m venv /tmp/ingest-venv
 /tmp/ingest-venv/bin/pip install --quiet -r "$REPO/ingestion/requirements.txt"
 
 cd "$REPO/ingestion"
@@ -444,7 +447,7 @@ aws s3 rm "s3://$BUCKET" --recursive && aws s3api delete-bucket --bucket "$BUCKE
 | El bootstrap se detiene en `pip install` o aparece `Killed` | Memoria insuficiente (2 GB) | Revisar `free -m`; relanzar `sudo bash /var/lib/cloud/instance/scripts/part-001` (es idempotente); plan B: `instance_type = "t4g.small"` con AMI arm64 o t3.medium |
 | `terraform init` falla con "no space left on device" | Disco local lleno | Liberar ≥ 1,5 GB |
 | Lambda: `Task timed out after 180 seconds` | Se invocó sin watermark | Hacer la carga inicial del paso 4 |
-| Athena: `INVALID_CAST_ARGUMENT` en `created_at` | El formato ISO 8601 de iNaturalist (`2024-05-01T10:23:45+02:00`) podría no aceptarse en `CAST(... AS TIMESTAMP)` | Cambiar en `stg_inaturalist__observations.sql` a `from_iso8601_timestamp(created_at)` (cambio de la 001, con su PR) |
+| Athena: `INVALID_CAST_ARGUMENT` en `created_at` | Versión antigua de staging: `CAST(... AS TIMESTAMP)` no acepta el ISO 8601 con zona de iNaturalist | Corregido con `from_iso8601_timestamp`; actualizar la instancia con `deploy.sh` |
 | dbt: `AccessDenied` | Falta un permiso en el rol de Airflow | Ver el paso 8 |
 | No llegan los emails | Suscripción SNS sin confirmar | Paso 2.3 |
 

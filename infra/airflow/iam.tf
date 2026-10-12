@@ -58,6 +58,8 @@ data "aws_iam_policy_document" "orchestration" {
       "glue:DeleteTable",
       "glue:GetPartition",
       "glue:GetPartitions",
+      "glue:GetTableVersions",
+      "glue:DeleteTableVersion",
       "glue:BatchCreatePartition",
       "glue:BatchDeletePartition",
     ]

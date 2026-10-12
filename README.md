@@ -71,7 +71,7 @@ Detalle completo en la [constitución del proyecto](.specify/memory/constitution
 |------|--------|-----------------|---------|
 | Staging | `stg_inaturalist__observations` | view | Casteo, aplanado del JSON, deduplicación |
 | Intermedia | `int_observations__geospatial_enriched` | view | Filtro bbox, franja horaria, bandera *research grade* |
-| Marts | `fct_observations` | incremental (`insert_overwrite`) | Hechos: una fila por observación |
+| Marts | `fct_observations` | table, reconstruida a diario (particionada por año/mes) | Hechos: una fila por observación |
 | Marts | `dim_species` | table | Especie / taxón |
 | Marts | `dim_users` | table | Observador |
 | Marts | `dim_date` | table | Calendario con estación biológica |

@@ -7,7 +7,8 @@ Contrato: specs/002-airflow-orchestration/contracts/dag-interface.md
   TestBehavior.AFTER_EACH); los modelos dependientes solo corren si los tests del padre pasan.
 - Reintentos (2 × 5 min) y alerta SNS cuando una tarea falla definitivamente.
 - Deadline Alert si la ejecución no ha terminado a las 07:00 UTC (antes del refresco de Power BI).
-- Parámetro full_refresh: reconstruye los modelos dbt incrementales; no afecta a la ingesta.
+- Parámetro full_refresh: pasa --full-refresh a dbt; no afecta a la ingesta. Hoy todos los
+  modelos se reconstruyen en cada ejecución, así que solo tiene efecto sobre modelos incrementales.
 - Power BI queda fuera del DAG (refresco programado a las 08:00 UTC).
 """
 
@@ -17,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from airflow.providers.amazon.aws.operators.lambda_function import LambdaInvokeFunctionOperator
 from airflow.sdk import DAG, DeadlineAlert, DeadlineReference, Param, SyncCallback
 from alerts import notify_deadline, notify_failure
+from cosmos.constants import TestIndirectSelection
 from cosmos import (
     DbtTaskGroup,
     ExecutionConfig,
@@ -93,7 +95,12 @@ with DAG(
             target_name="prod",
             profiles_yml_filepath=f"{DBT_PROFILES_DIR}/profiles.yml",
         ),
-        execution_config=ExecutionConfig(dbt_executable_path=DBT_EXECUTABLE_PATH),
+        execution_config=ExecutionConfig(
+            dbt_executable_path=DBT_EXECUTABLE_PATH,
+            # Un test con varios padres (relationships de fct → dimensiones) solo se ejecuta cuando
+            # todos sus padres están construidos: en la tarea de test de fct, no en la de cada dimensión.
+            test_indirect_selection=TestIndirectSelection.BUILDABLE,
+        ),
         render_config=RenderConfig(
             load_method=LoadMode.DBT_MANIFEST,
             test_behavior=TestBehavior.AFTER_EACH,

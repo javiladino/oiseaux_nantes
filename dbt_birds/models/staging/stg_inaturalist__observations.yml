@@ -14,9 +14,14 @@ models:
         tests:
           - not_null
       - name: observed_on
-        description: "Calendar date when the observation was made (YYYY-MM-DD)."
+        description: >
+          Calendar date when the observation was made (YYYY-MM-DD). Nullable at source:
+          observers may leave it empty (~0.4% of rows). Staging keeps them; the intermediate
+          layer excludes them.
         tests:
-          - not_null
+          - not_null:
+              config:
+                severity: warn
       - name: latitude
         description: "WGS84 latitude extracted from the 'lat,lng' location string."
         tests:

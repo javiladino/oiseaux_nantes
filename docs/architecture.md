@@ -160,7 +160,7 @@ flowchart TD
         DS["dim_species<br/>table"]
         DU["dim_users<br/>table"]
         DD["dim_date<br/>table · ±30 días · biological_season"]
-        FCT["fct_observations<br/>incremental · insert_overwrite<br/>partición (year, month)"]
+        FCT["fct_observations<br/>table · reconstrucción diaria<br/>partición (year, month)"]
     end
 
     TBBOX{{"test singular<br/>assert_observations_within_nantes_bbox"}}

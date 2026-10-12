@@ -174,9 +174,7 @@ dbt test --select int_observations__geospatial_enriched
 ### Pasos
 
 ```bash
-# 1. Ejecutar el DAG completo de dbt (primera ejecución: usar --full-refresh para los modelos incrementales)
-dbt run --full-refresh
-# O, para ejecuciones incrementales posteriores:
+# 1. Ejecutar todos los modelos (fct_observations se reconstruye completa en cada ejecución)
 dbt run
 
 # 2. Ejecutar todos los tests

@@ -49,6 +49,8 @@ Marcadores: `<account-id>`, `<bucket>`, `<region>` = `eu-west-3`.
         "glue:DeleteTable",
         "glue:GetPartition",
         "glue:GetPartitions",
+        "glue:GetTableVersions",
+        "glue:DeleteTableVersion",
         "glue:BatchCreatePartition",
         "glue:BatchDeletePartition"
       ],
@@ -114,6 +116,10 @@ Notas:
 | Salida | HTTPS 443 a `0.0.0.0/0` (APIs de AWS, GitHub, PyPI) |
 
 ## Evolución del contrato
+
+- **2026-10-12:** añadidas `glue:GetTableVersions` y `glue:DeleteTableVersion`. dbt-athena las
+  usa al final de cada modelo (vista, tabla o incremental) para expirar versiones antiguas de la
+  tabla en Glue (`expire_glue_table_versions`); sin `GetTableVersions` todos los modelos fallan.
 
 La lista de acciones de Glue y S3 que necesita dbt-athena se validará con la primera ejecución
 real (T021). Si aparece un `AccessDenied`, se añade aquí la acción mínima concreta, sobre un ARN

@@ -7,11 +7,15 @@ WITH date_bounds AS (
     FROM {{ ref('int_observations__geospatial_enriched') }}
 ),
 
+-- SEQUENCE admite como máximo 10.000 elementos en Athena (~27 años) y el histórico de
+-- iNaturalist llega a 1970: se combinan dos secuencias (hasta 100.000 días, ~273 años).
 date_spine AS (
     SELECT
-        DATE_ADD('day', seq, start_date) AS date_key
-    FROM date_bounds
-    CROSS JOIN UNNEST(SEQUENCE(0, DATE_DIFF('day', start_date, end_date))) AS t(seq)
+        DATE_ADD('day', t.i * 1000 + u.j, b.start_date) AS date_key
+    FROM date_bounds b
+    CROSS JOIN UNNEST(SEQUENCE(0, 99))  AS t(i)
+    CROSS JOIN UNNEST(SEQUENCE(0, 999)) AS u(j)
+    WHERE t.i * 1000 + u.j <= DATE_DIFF('day', b.start_date, b.end_date)
 )
 
 SELECT
