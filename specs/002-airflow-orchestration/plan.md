@@ -129,7 +129,7 @@ tests/
     └── test_dag_integrity.py
 
 .github/workflows/
-├── dbt_ci.yml                          # Existente, sin cambios
+├── dbt_ci.yml                          # Existente; pasa a validación con dbt parse (sin AWS)
 └── airflow_ci.yml                      # Nuevo: validación del DAG en PRs
 
 docs/

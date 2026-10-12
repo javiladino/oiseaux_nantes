@@ -22,7 +22,7 @@ proyecto, el pipeline completo: ingesta (feature 001) y orquestación con Airflo
 2. [Bucket S3, bases de datos de Glue y alertas](#paso-2--bucket-s3-bases-de-datos-de-glue-y-alertas)
 3. [Función Lambda de ingesta](#paso-3--función-lambda-de-ingesta)
 4. [Carga histórica inicial (desde tu máquina)](#paso-4--carga-histórica-inicial-desde-tu-máquina)
-5. [Tabla raw en Athena](#paso-5--tabla-raw-en-athena)
+5. [Tabla raw en Athena (automática)](#paso-5--tabla-raw-en-athena-automática)
 6. [Desplegar la EC2 de Airflow con Terraform](#paso-6--desplegar-la-ec2-de-airflow-con-terraform)
 7. [Verificar la instalación](#paso-7--verificar-la-instalación)
 8. [Primera ejecución del DAG (validación)](#paso-8--primera-ejecución-del-dag-validación)
@@ -242,58 +242,19 @@ aws lambda invoke --function-name birds-inaturalist-ingestion /tmp/lambda-out.js
 
 ---
 
-## Paso 5 — Tabla raw en Athena
+## Paso 5 — Tabla raw en Athena (automática)
 
-> **Aviso — cambio respecto a la documentación de la 001.** El README y el quickstart de la 001
-> indican registrar la tabla raw con `dbt run-operation stage_external_sources`. Eso **no
-> funciona con Athena**: el paquete `dbt-labs/dbt_external_tables` no tiene implementación para
-> este adaptador y falla con *"Staging external sources is not implemented for the default
-> adapter"*. Además, como la ingesta crea una partición nueva cada mes, alguien tendría que
-> registrarla cada mes, y el DAG no lo hace.
->
-> Esta guía crea la tabla con **partition projection**: Athena deduce las particiones
-> `year=/month=` por sí mismo, sin `MSCK REPAIR` ni registro mensual. Conviene versionar este
-> DDL en el repositorio (cambio pendiente; ver la sección final).
+**No hay que hacer nada en este paso.** La tabla externa `birds_raw.observations` la crea la
+macro `dbt_birds/macros/create_raw_observations_table.sql`, que `orchestration/deploy/deploy.sh`
+ejecuta en cada despliegue, incluido el primero durante la instalación de la instancia (paso 6).
+La macro es idempotente (`CREATE EXTERNAL TABLE IF NOT EXISTS`).
 
-1. Abre la consola de **Athena** en `eu-west-3` → **Query editor**.
-2. Si es la primera vez, en **Settings** fija la ubicación de resultados:
-   `s3://<tu-bucket>/athena-results/`.
-3. Ejecuta este DDL **sustituyendo `<tu-bucket>` en las dos líneas marcadas**:
+La tabla usa **partition projection**: Athena deduce las particiones `year=/month=` a partir de
+la ruta de S3, así que las particiones nuevas de cada mes se ven sin `MSCK REPAIR` ni registro
+manual. La comprobación de los datos está en el paso 7.
 
-```sql
-CREATE EXTERNAL TABLE IF NOT EXISTS birds_raw.observations (
-  id                  bigint,
-  created_at          string,
-  observed_on         string,
-  location            string,
-  positional_accuracy int,
-  quality_grade       string,
-  taxon  struct<id:bigint, name:string, preferred_common_name:string, rank:string, threatened:boolean>,
-  `user` struct<id:bigint, login:string, name:string>
-)
-PARTITIONED BY (year string, month string)
-ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
-WITH SERDEPROPERTIES ('ignore.malformed.json' = 'true')
-LOCATION 's3://<tu-bucket>/raw/inaturalist/observations/'                          -- ← sustituir
-TBLPROPERTIES (
-  'projection.enabled'         = 'true',
-  'projection.year.type'       = 'integer',
-  'projection.year.range'      = '2024,2040',
-  'projection.month.type'      = 'integer',
-  'projection.month.range'     = '1,12',
-  'projection.month.digits'    = '2',
-  'storage.location.template'  = 's3://<tu-bucket>/raw/inaturalist/observations/year=${year}/month=${month}/'  -- ← sustituir
-);
-```
-
-4. Comprueba que lee los datos de la carga inicial:
-
-```sql
-SELECT year, month, COUNT(*) AS observaciones, COUNT(DISTINCT id) AS distintas
-FROM birds_raw.observations
-GROUP BY year, month;
--- Esperado: una fila con ~18.500 observaciones
-```
+> Si alguna vez necesitas crearla desde tu máquina (con dbt instalado y el perfil configurado):
+> `cd dbt_birds && BIRDS_S3_BUCKET=$BUCKET dbt run-operation create_raw_observations_table`
 
 ---
 
@@ -354,6 +315,17 @@ sudo -u airflow bash -c 'set -a; source /etc/airflow/airflow.env; set +a; /opt/a
 
 sudo cat /opt/airflow/simple_auth_manager_passwords.json.generated
 # Guarda la contraseña del usuario admin
+```
+
+Comprueba en la consola de **Athena** (`eu-west-3` → Query editor) que la tabla raw existe y lee
+la carga inicial. Si es la primera vez que usas Athena, en **Settings** fija la ubicación de
+resultados `s3://<tu-bucket>/athena-results/`.
+
+```sql
+SELECT year, month, COUNT(*) AS observaciones, COUNT(DISTINCT id) AS distintas
+FROM birds_raw.observations
+GROUP BY year, month;
+-- Esperado: una fila con ~18.500 observaciones
 ```
 
 Abre la UI desde tu máquina (deja la terminal abierta mientras la uses):
@@ -480,9 +452,5 @@ aws s3 rm "s3://$BUCKET" --recursive && aws s3api delete-bucket --bucket "$BUCKE
 
 ## Cambios pendientes detectados al preparar esta guía
 
-1. **Registro de la tabla raw (feature 001).** `stage_external_sources` no funciona con Athena
-   (ver el paso 5). Propuesta: versionar el DDL con partition projection como macro de dbt
-   (`dbt run-operation create_raw_observations_table`), retirar `dbt_external_tables` de
-   `packages.yml` y corregir el README y el quickstart de la 001.
-2. **Carga inicial.** Documentar en la spec 001 que la primera carga se hace fuera de Lambda
+1. **Carga inicial.** Documentar en la spec 001 que la primera carga se hace fuera de Lambda
    (paso 4), o permitir que la ingesta trabaje por tramos de fechas.

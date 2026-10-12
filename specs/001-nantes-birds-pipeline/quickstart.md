@@ -103,9 +103,10 @@ aws s3 ls s3://{bucket}/raw/inaturalist/observations/ --recursive | wc -l
 ### Pasos
 
 ```bash
-# 1. Registrar la tabla raw externa (una sola vez, cuando ya existan datos raw)
+# 1. Crear la tabla raw externa (idempotente; usa partition projection, así que las
+#    particiones de cada mes son visibles sin registrarlas)
 cd dbt_birds
-dbt run-operation stage_external_sources
+BIRDS_S3_BUCKET=<bucket> dbt run-operation create_raw_observations_table
 
 # 2. Ejecutar el modelo de staging
 dbt run --select stg_inaturalist__observations
@@ -279,10 +280,16 @@ aws ssm get-parameter --name /birds-pipeline/last_successful_run_date
 Cada PR que modifica `dbt_birds/` dispara:
 
 ```yaml
-# .github/workflows/dbt_ci.yml
-- run: dbt compile
-- run: dbt test --select state:modified+
+# .github/workflows/dbt_ci.yml (validación estática, sin conexión a AWS)
+- run: dbt deps
+- run: dbt parse --profiles-dir ../orchestration/config --target ci
 ```
 
-Un `dbt test` fallido debe bloquear el merge del PR (constitución III). Revisar el badge de
-estado del workflow o la pestaña Actions antes de hacer merge.
+> **Cambio (2026-10-12):** la versión original ejecutaba `dbt compile` y
+> `dbt test --select state:modified+` contra Athena, pero nunca llegó a funcionar (sin
+> credenciales de AWS ni `--state`). Hasta configurar un rol OIDC para GitHub Actions, la CI
+> solo valida el proyecto con `dbt parse`.
+
+Un `dbt test` fallido debe bloquear el merge del PR (constitución III). Mientras la CI no
+ejecute tests contra Athena, antes de fusionar un PR que modifique `dbt_birds/` hay que ejecutar
+`dbt build` contra Athena y comprobar que todos los tests pasan.
