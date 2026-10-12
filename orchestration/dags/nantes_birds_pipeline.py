@@ -7,7 +7,8 @@ Contrato: specs/002-airflow-orchestration/contracts/dag-interface.md
   TestBehavior.AFTER_EACH); los modelos dependientes solo corren si los tests del padre pasan.
 - Reintentos (2 × 5 min) y alerta SNS cuando una tarea falla definitivamente.
 - Deadline Alert si la ejecución no ha terminado a las 07:00 UTC (antes del refresco de Power BI).
-- Parámetro full_refresh: reconstruye los modelos dbt incrementales; no afecta a la ingesta.
+- Parámetro full_refresh: pasa --full-refresh a dbt; no afecta a la ingesta. Hoy todos los
+  modelos se reconstruyen en cada ejecución, así que solo tiene efecto sobre modelos incrementales.
 - Power BI queda fuera del DAG (refresco programado a las 08:00 UTC).
 """
 

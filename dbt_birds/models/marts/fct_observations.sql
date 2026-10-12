@@ -1,7 +1,12 @@
+{#
+  Se reconstruye completa en cada ejecución (2026-10-12). La versión incremental con
+  insert_overwrite y el filtro observed_on > MAX(date_key) borraba las filas anteriores del
+  mes en curso (insert_overwrite reemplaza particiones completas) y nunca recogía las
+  observaciones subidas con retraso.
+#}
 {{
     config(
-        materialized='incremental',
-        incremental_strategy='insert_overwrite',
+        materialized='table',
         partitioned_by=['year', 'month'],
         format='parquet',
         write_compression='snappy'
@@ -10,9 +15,6 @@
 
 WITH int_obs AS (
     SELECT * FROM {{ ref('int_observations__geospatial_enriched') }}
-    {% if is_incremental() %}
-    WHERE observed_on > (SELECT MAX(date_key) FROM {{ this }})
-    {% endif %}
 ),
 
 dim_species AS (SELECT * FROM {{ ref('dim_species') }}),

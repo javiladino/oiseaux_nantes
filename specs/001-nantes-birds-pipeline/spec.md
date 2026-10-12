@@ -41,7 +41,7 @@ Un ingeniero analítico necesita un modelo dimensional limpio y validado de obse
 2. **Dado** que el modelo de staging está poblado, **Cuando** se ejecuta el modelo intermedio, **Entonces** solo se conservan los registros cuyas coordenadas caen dentro del bounding box del Gran Nantes, y cada registro lleva la bandera `is_research_grade` y la clasificación `observation_period`.
 3. **Dado** que el modelo intermedio está poblado, **Cuando** se ejecuta la capa de marts, **Entonces** `fct_observations` referencia claves válidas en las tres tablas de dimensiones, `dim_date` cubre el rango completo de fechas de observación y todos los tests de dbt pasan.
 4. **Dado** que llega un registro con un valor de quality grade inválido, **Cuando** se ejecutan los tests de dbt, **Entonces** el test `accepted_values` falla y el pipeline no promueve el dato.
-5. **Dado** que la capa de marts ya existe, **Cuando** se ejecuta el modelo incremental `fct_observations`, **Entonces** solo se agregan los registros nuevos y ningún registro existente se duplica.
+5. **Dado** que la capa de marts ya existe, **Cuando** se vuelve a ejecutar `fct_observations`, **Entonces** contiene todas las observaciones válidas (incluidas las subidas con retraso) y ningún registro se duplica. *(Actualizado el 2026-10-12: el modelo se reconstruye completo en cada ejecución; ver data-model.md.)*
 
 ---
 

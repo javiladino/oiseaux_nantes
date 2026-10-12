@@ -153,7 +153,9 @@ Nota: la clasificación se basa en la hora local (hora de París = UTC+1/+2) —
 **Propósito**: Tabla de hechos central para las consultas analíticas de Power BI. Una fila por
 observación de ave válida dentro del Gran Nantes.
 
-**Materialización**: `incremental` (`insert_overwrite`, particionada por `(year, month)`)
+**Materialización**: `table`, reconstruida en cada ejecución (Parquet + Snappy, particionada por `(year, month)`)
+
+> **Cambio (2026-10-12):** `fct_observations` pasa a reconstruirse completa en cada ejecución. La versión incremental (`insert_overwrite` + `observed_on > MAX(date_key)`) borraba las filas anteriores del mes en curso, porque `insert_overwrite` reemplaza particiones completas, y nunca recogía las observaciones subidas con retraso.
 
 **Granularidad**: Una fila por `observation_id`
 
@@ -173,7 +175,7 @@ observación de ave válida dentro del Gran Nantes.
 | `year` | INT | — | Clave de partición |
 | `month` | INT | — | Clave de partición |
 
-**Filtro incremental**: `WHERE observed_on > (SELECT MAX(date_key) FROM {{ this }})`
+**Filtro incremental**: ninguno (reconstrucción completa; ver la nota de la materialización)
 
 **Tests dbt**:
 - `observation_id`: `unique`, `not_null`
