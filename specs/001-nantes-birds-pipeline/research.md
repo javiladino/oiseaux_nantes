@@ -214,6 +214,12 @@ sources:
 ```
 Registrar con: `dbt run-operation stage_external_sources`
 
+> **Corrección (2026-10-11):** `dbt-labs/dbt_external_tables` no implementa Athena, así que
+> `stage_external_sources` falla con este adaptador. La tabla raw se crea con la macro
+> `dbt_birds/macros/create_raw_observations_table.sql` (DDL con *partition projection*), que
+> además hace visibles las particiones nuevas de cada mes sin `MSCK REPAIR`. El paquete se
+> retiró de `packages.yml` y el bloque `external:` de `sources.yml`.
+
 **Trampas**:
 - `s3_staging_dir` guarda los resultados de consultas de Athena (temporales); `s3_data_dir`
   guarda los datos de los modelos dbt

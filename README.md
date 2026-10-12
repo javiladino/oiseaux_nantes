@@ -60,7 +60,7 @@ Detalle completo en la [constitución del proyecto](.specify/memory/constitution
 | Estado incremental | AWS SSM Parameter Store |
 | Data Lake | AWS S3 (raw JSON / procesado Parquet) |
 | Catálogo y cómputo | AWS Glue Data Catalog + AWS Athena |
-| Transformación | dbt-core + dbt-athena, `dbt_utils`, `dbt_external_tables` |
+| Transformación | dbt-core + dbt-athena, `dbt_utils` |
 | Visualización | Power BI Desktop / Service |
 | CI | GitHub Actions |
 | Alertas | Callbacks de Airflow + CloudWatch Alarms → SNS |
@@ -88,7 +88,7 @@ y [contracts/dbt-models.md](specs/001-nantes-birds-pipeline/contracts/dbt-models
 ├── dbt_birds/                 # Proyecto dbt: sources, staging, intermediate, marts, tests
 ├── orchestration/             # Airflow: DAG, alertas, configuración, bootstrap, despliegue, systemd
 ├── infra/airflow/             # Terraform de la EC2 de Airflow (IAM, security group)
-├── .github/workflows/         # CI: dbt (compile + test) e integridad del DAG en cada PR
+├── .github/workflows/         # CI: dbt parse e integridad del DAG en cada PR
 ├── reports/                   # Informe de Power BI (.pbix)
 ├── docs/                      # Arquitectura, infraestructura, Airflow, Power BI, validación
 └── specs/                     # Spec, plan, investigación, contratos y tareas de cada feature
@@ -97,6 +97,9 @@ y [contracts/dbt-models.md](specs/001-nantes-birds-pipeline/contracts/dbt-models
 ```
 
 ## Puesta en Marcha
+
+> Para un despliegue completo desde cero en AWS, seguir el
+> [instructivo de despliegue](docs/despliegue-aws.md) paso a paso.
 
 ### Requisitos
 
@@ -149,7 +152,7 @@ pytest tests/orchestration/ -v
 pip install dbt-athena-community
 cd dbt_birds
 dbt deps
-dbt run-operation stage_external_sources   # una vez, cuando ya existan datos raw
+BIRDS_S3_BUCKET=<bucket> dbt run-operation create_raw_observations_table   # tabla raw (idempotente)
 dbt run --full-refresh                     # primera ejecución
 dbt test
 ```
@@ -167,7 +170,7 @@ estrella, los tres visuales (mapa, tendencia estacional, ranking) y las medidas 
 |------------|--------|
 | Ingesta en Lambda + tests unitarios | ✅ Implementada — 14/14 tests pasan |
 | Modelos y tests dbt | ✅ Implementados |
-| CI de GitHub Actions | ✅ Configurada (dbt + integridad del DAG) |
+| CI de GitHub Actions | ✅ `dbt parse` + integridad del DAG · ⏳ `dbt test` contra Athena pendiente de credenciales (OIDC) |
 | Orquestación con Airflow (código, Terraform, docs) | ✅ Implementada — pendiente de desplegar y validar en AWS |
 | Documentación de infraestructura y Power BI | ✅ Completa |
 | Informe `reports/nantes_birds.pbix` | ⏳ Pendiente (se crea en Power BI Desktop) |
@@ -184,6 +187,7 @@ estrella, los tres visuales (mapa, tendencia estacional, ranking) y las medidas 
 - [Orquestación con Airflow — spec](specs/002-airflow-orchestration/spec.md) ·
   [plan](specs/002-airflow-orchestration/plan.md) ·
   [tareas](specs/002-airflow-orchestration/tasks.md)
+- [Instructivo de despliegue en AWS](docs/despliegue-aws.md)
 - [Operación de Airflow](docs/airflow-operations.md)
 
 ## Datos y Licencia
