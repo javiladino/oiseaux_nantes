@@ -88,7 +88,7 @@ y [contracts/dbt-models.md](specs/001-nantes-birds-pipeline/contracts/dbt-models
 ├── dbt_birds/                 # Proyecto dbt: sources, staging, intermediate, marts, tests
 ├── orchestration/             # Airflow: DAG, alertas, configuración, bootstrap, despliegue, systemd
 ├── infra/airflow/             # Terraform de la EC2 de Airflow (IAM, security group)
-├── .github/workflows/         # CI: dbt (compile + test) e integridad del DAG en cada PR
+├── .github/workflows/         # CI: dbt parse e integridad del DAG en cada PR
 ├── reports/                   # Informe de Power BI (.pbix)
 ├── docs/                      # Arquitectura, infraestructura, Airflow, Power BI, validación
 └── specs/                     # Spec, plan, investigación, contratos y tareas de cada feature
@@ -170,7 +170,7 @@ estrella, los tres visuales (mapa, tendencia estacional, ranking) y las medidas 
 |------------|--------|
 | Ingesta en Lambda + tests unitarios | ✅ Implementada — 14/14 tests pasan |
 | Modelos y tests dbt | ✅ Implementados |
-| CI de GitHub Actions | ✅ Configurada (dbt + integridad del DAG) |
+| CI de GitHub Actions | ✅ `dbt parse` + integridad del DAG · ⏳ `dbt test` contra Athena pendiente de credenciales (OIDC) |
 | Orquestación con Airflow (código, Terraform, docs) | ✅ Implementada — pendiente de desplegar y validar en AWS |
 | Documentación de infraestructura y Power BI | ✅ Completa |
 | Informe `reports/nantes_birds.pbix` | ⏳ Pendiente (se crea en Power BI Desktop) |

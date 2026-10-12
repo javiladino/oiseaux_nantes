@@ -237,13 +237,19 @@ erDiagram
 flowchart LR
     DEV["Desarrollador"] -->|"PR que modifica dbt_birds/**"| GH["GitHub"]
     GH --> WF["GitHub Actions<br/>.github/workflows/dbt_ci.yml"]
-    WF --> S1["pip install dbt-athena-community"]
-    S1 --> S2["profiles.yml desde secrets<br/>DBT_ATHENA_S3_STAGING_DIR<br/>DBT_ATHENA_S3_DATA_DIR"]
-    S2 --> S3["dbt compile"]
-    S3 --> S4["dbt test --select state:modified+"]
-    S4 -->|"todos pasan"| OK(["Merge permitido en main"])
-    S4 -->|"algún test falla"| KO(["Workflow fallido · merge bloqueado<br/>(constitución III · SC-004)"])
+    WF --> S1["pip install dbt-athena-community<br/>dbt deps"]
+    S1 --> S2["dbt parse<br/>target ci · sin conexión a AWS"]
+    S2 -->|"proyecto válido"| MAN["Verificación manual antes del merge:<br/>dbt build contra Athena"]
+    MAN -->|"todos los tests pasan"| OK(["Merge permitido en main"])
+    S2 -->|"error de parseo"| KO(["Workflow fallido · merge bloqueado"])
 ```
+
+**Limitación temporal (constitución III):** la CI no tiene credenciales de AWS, así que solo
+valida el proyecto con `dbt parse`. Hasta configurar un rol OIDC para GitHub Actions, antes de
+fusionar un PR que modifique `dbt_birds/` hay que ejecutar `dbt build` contra Athena y comprobar
+que todos los tests pasan (por ejemplo, desde la EC2 de Airflow como usuario `airflow`, sobre la
+rama del PR). En producción, el DAG ejecuta los tests de cada modelo antes de construir sus
+dependientes.
 
 ---
 
@@ -262,7 +268,7 @@ flowchart LR
 | Despliegue de Airflow | `orchestration/bootstrap/`, `orchestration/deploy/`, `orchestration/systemd/` | Instalación en la EC2, `git pull` + `dbt parse`, servicios |
 | Infraestructura de Airflow | `infra/airflow/` | Terraform: EC2, IAM, security group |
 | Tests del DAG | `tests/orchestration/` | Integridad del DAG, tarea de ingesta, alertas |
-| CI | `.github/workflows/dbt_ci.yml`, `.github/workflows/airflow_ci.yml` | `dbt compile` + `dbt test`; integridad del DAG en cada PR |
+| CI | `.github/workflows/dbt_ci.yml`, `.github/workflows/airflow_ci.yml` | `dbt parse` (sin AWS); integridad del DAG en cada PR |
 | Infraestructura | `docs/infrastructure.md` | EventBridge (desactivada), CloudWatch, SNS, IAM (vía AWS CLI) |
 | Operación de Airflow | `docs/airflow-operations.md` | Acceso, despliegue, ejecuciones manuales, recuperación |
 | Power BI | `reports/`, `docs/powerbi-setup.md` | Conexión ODBC, relaciones, visuales y medidas DAX |
