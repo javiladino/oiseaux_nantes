@@ -43,7 +43,8 @@ models:
           - accepted_values:
               values: [Madrugada, "Mañana", Tarde, Noche]
           - dbt_utils.expression_is_true:
-              expression: "observation_period IN ('Madrugada', 'Mañana', 'Tarde', 'Noche')"
+              # A nivel de columna, dbt_utils antepone el nombre de la columna a la expresión.
+              expression: "IN ('Madrugada', 'Mañana', 'Tarde', 'Noche')"
       - name: taxon_id
         description: "iNaturalist taxon identifier."
         tests:
