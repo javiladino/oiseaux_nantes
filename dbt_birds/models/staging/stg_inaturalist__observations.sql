@@ -8,7 +8,9 @@ WITH raw AS (
 parsed AS (
     SELECT
         CAST(id AS BIGINT)                                          AS observation_id,
-        CAST(created_at AS TIMESTAMP)                               AS created_at_utc,
+        -- iNaturalist envía ISO 8601 con zona (2026-09-10T10:01:44+02:00): CAST no lo acepta.
+        -- Se normaliza a UTC sin zona porque Parquet en Athena no admite timestamp with time zone.
+        CAST(from_iso8601_timestamp(created_at) AT TIME ZONE 'UTC' AS TIMESTAMP) AS created_at_utc,
         CAST(observed_on AS DATE)                                   AS observed_on,
         CAST(split_part(location, ',', 1) AS DOUBLE)                AS latitude,
         CAST(split_part(location, ',', 2) AS DOUBLE)                AS longitude,
@@ -25,7 +27,7 @@ parsed AS (
         year                                                        AS _ingested_year,
         month                                                       AS _ingested_month,
         ROW_NUMBER() OVER (
-            PARTITION BY id ORDER BY CAST(created_at AS TIMESTAMP) DESC
+            PARTITION BY id ORDER BY from_iso8601_timestamp(created_at) DESC
         )                                                           AS _row_num
     FROM raw
 )

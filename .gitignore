@@ -32,3 +32,4 @@ dbt_birds/logs/
 .terraform/
 infra/airflow/*.tfvars
 infra/airflow/.terraform/
+infra/airflow/tfplan
