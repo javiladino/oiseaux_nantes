@@ -82,5 +82,5 @@ models:
         tests:
           - not_null
 
-    tests:
-      - assert_observations_within_nantes_bbox
+    # El test singular tests/assert_observations_within_nantes_bbox.sql se ejecuta solo porque
+    # hace ref() a este modelo; no se declara aquí (no es un test genérico).
