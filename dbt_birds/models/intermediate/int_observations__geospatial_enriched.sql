@@ -10,6 +10,9 @@ bbox_filtered AS (
     WHERE
         latitude  >= 46.8600781 AND latitude  <= 47.8359431
         AND longitude >= -2.6257395 AND longitude <= -0.9466615
+        -- Sin fecha de observación no hay date_key en el modelo estrella; staging las conserva
+        -- y su test not_null de observed_on avisa (warn) de cuántas hay.
+        AND observed_on IS NOT NULL
 ),
 
 enriched AS (
