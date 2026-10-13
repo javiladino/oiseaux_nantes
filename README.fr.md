@@ -15,7 +15,7 @@ privilège, pour un coût d'exploitation quasi nul.
 
 ![Rapport Power BI : KPI, carte de densité, saisonnalité et espèce la plus observée avec photo](docs/images/powerbi-dashboard.png)
 
-*Rapport Power BI sur le schéma en étoile (filtré sur 2025, qualité recherche).*
+*Rapport Power BI sur le schéma en étoile (année 2026, toutes saisons et tous niveaux de qualité).*
 
 ## En chiffres
 

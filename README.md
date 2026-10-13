@@ -14,7 +14,7 @@ near-zero running cost.
 
 ![Power BI report: KPIs, density map, seasonality and top species with photo](docs/images/powerbi-dashboard.png)
 
-*Power BI report on the star schema (filtered to 2025, research grade).*
+*Power BI report on the star schema (filtered to 2026, all seasons and quality grades).*
 
 ## Highlights
 

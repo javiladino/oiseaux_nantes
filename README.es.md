@@ -15,7 +15,7 @@ privilegio, con un coste operativo casi nulo.
 
 ![Informe de Power BI: KPIs, mapa de densidad, estacionalidad y especie más observada con foto](docs/images/powerbi-dashboard.png)
 
-*Informe de Power BI sobre el modelo estrella (filtrado a 2025 y grado de investigación).*
+*Informe de Power BI sobre el modelo estrella (año 2026, todas las estaciones y grados de calidad).*
 
 ## En cifras
 
