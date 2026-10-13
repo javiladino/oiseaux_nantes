@@ -61,7 +61,9 @@ Despliegue siguiendo `docs/despliegue-aws.md` en la cuenta `437266392155` (`eu-w
 | T031 · Escenario 4 | Reconstrucción completa bajo demanda | PENDIENTE | |
 | T037 · Escenarios 5 y 6 | IAM y programador único | PENDIENTE | |
 | T039 | Coste mensual ≤ 25 USD | PENDIENTE | Revisar en Cost Explorer tras una semana |
-| — | Primera ejecución programada (05:00 UTC) | PENDIENTE | 2026-10-13 |
+| — | Primera ejecución programada (05:00 UTC) | ✅ PASS (2026-10-13) | `scheduled__2026-10-13T05:00` en `success` sin intervención manual |
+
+| — | Fotos de especies en `dim_species` (PR #7) | ✅ PASS (2026-10-13) | Tabla raw recreada con `recreate: true`; DAG en `success`; Top 3 con `photo_url`, licencia y atribución |
 
 ### Problemas encontrados y corregidos durante el despliegue
 
