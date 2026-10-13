@@ -10,8 +10,12 @@
 
   Uso (idempotente; deploy.sh lo ejecuta en cada despliegue):
     dbt run-operation create_raw_observations_table
+
+  Si cambian las columnas, la tabla existente no se actualiza sola: recrearla con
+    dbt run-operation create_raw_observations_table --args '{recreate: true}'
+  DROP TABLE en una tabla externa solo borra el metadato; los JSON de S3 no se tocan.
 #}
-{% macro create_raw_observations_table() %}
+{% macro create_raw_observations_table(recreate=false) %}
     {%- set location = 's3://' ~ env_var('BIRDS_S3_BUCKET') ~ '/raw/inaturalist/observations/' -%}
 
     {%- set ddl -%}
@@ -22,7 +26,11 @@ CREATE EXTERNAL TABLE IF NOT EXISTS birds_raw.observations (
     location            string,
     positional_accuracy int,
     quality_grade       string,
-    taxon               struct<id:bigint, name:string, preferred_common_name:string, rank:string, threatened:boolean>,
+    taxon               struct<
+                            id:bigint, name:string, preferred_common_name:string, rank:string,
+                            threatened:boolean, wikipedia_url:string,
+                            default_photo:struct<medium_url:string, square_url:string, attribution:string, license_code:string>
+                        >,
     `user`              struct<id:bigint, login:string, name:string>
 )
 PARTITIONED BY (year string, month string)
@@ -40,6 +48,10 @@ TBLPROPERTIES (
 )
     {%- endset -%}
 
+    {% if recreate %}
+        {% do run_query('DROP TABLE IF EXISTS birds_raw.observations') %}
+        {{ log("Tabla birds_raw.observations eliminada (solo metadato) para recrearla", info=True) }}
+    {% endif %}
     {% do run_query(ddl) %}
     {{ log("Tabla birds_raw.observations disponible sobre " ~ location, info=True) }}
 {% endmacro %}

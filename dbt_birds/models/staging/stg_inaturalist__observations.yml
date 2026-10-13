@@ -55,6 +55,14 @@ models:
         description: "Whether iNaturalist flags the taxon as threatened."
         tests:
           - not_null
+      - name: taxon_photo_url
+        description: "URL (medium size) of the taxon's default photo on iNaturalist; nullable."
+      - name: taxon_photo_attribution
+        description: "Photo credit as required by its licence, e.g. '(c) Name, some rights reserved (CC BY-NC)'."
+      - name: taxon_photo_license
+        description: "Photo licence code (cc-by, cc-by-nc, cc0...); null means all rights reserved."
+      - name: taxon_wikipedia_url
+        description: "Wikipedia article of the taxon; nullable."
       - name: user_id
         description: "iNaturalist user identifier flattened from nested user object."
         tests:

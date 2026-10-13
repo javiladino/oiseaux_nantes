@@ -28,3 +28,19 @@ models:
         description: "True when iNaturalist flags the taxon as threatened."
         tests:
           - not_null
+      - name: photo_url
+        description: >
+          Default photo of the taxon on iNaturalist (medium size). In Power BI set its data
+          category to "Image URL". Nullable: some taxa have no photo.
+        tests:
+          - dbt_utils.expression_is_true:
+              # A nivel de columna, dbt_utils antepone el nombre de la columna a la expresión.
+              expression: "LIKE 'https://%'"
+              config:
+                severity: warn
+      - name: photo_attribution
+        description: "Photo credit; must be shown next to the image."
+      - name: photo_license
+        description: "Photo licence code; null means all rights reserved (filter it out before publishing the report)."
+      - name: wikipedia_url
+        description: "Wikipedia article of the taxon; in Power BI set its data category to \"Web URL\"."
