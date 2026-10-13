@@ -10,6 +10,10 @@ WITH ranked AS (
         taxon_common_name,
         taxon_rank,
         taxon_threatened,
+        taxon_photo_url,
+        taxon_photo_attribution,
+        taxon_photo_license,
+        taxon_wikipedia_url,
         ROW_NUMBER() OVER (
             PARTITION BY taxon_id ORDER BY created_at_utc DESC, observation_id DESC
         ) AS _row_num
@@ -22,6 +26,10 @@ SELECT
     taxon_scientific_name   AS scientific_name,
     taxon_common_name       AS common_name,
     taxon_rank,
-    taxon_threatened        AS is_threatened
+    taxon_threatened        AS is_threatened,
+    taxon_photo_url         AS photo_url,
+    taxon_photo_attribution AS photo_attribution,
+    taxon_photo_license     AS photo_license,
+    taxon_wikipedia_url     AS wikipedia_url
 FROM ranked
 WHERE _row_num = 1

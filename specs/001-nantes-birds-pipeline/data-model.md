@@ -204,11 +204,19 @@ Tipo 1 — se sobrescribe en cada re-ejecución).
 | `common_name` | VARCHAR | Admite nulos (ausente en taxones poco comunes) |
 | `taxon_rank` | VARCHAR | p. ej., `species`, `subspecies`, `genus` |
 | `is_threatened` | BOOLEAN | Bandera de amenaza de iNaturalist |
+| `photo_url` | VARCHAR | Foto representativa del taxón (`taxon.default_photo.medium_url`); admite nulos. Añadida el 2026-10-13 |
+| `photo_attribution` | VARCHAR | Crédito de la foto; debe mostrarse junto a la imagen |
+| `photo_license` | VARCHAR | Licencia de la foto (`cc-by`, `cc-by-nc`, `cc0`…); nulo = todos los derechos reservados |
+| `wikipedia_url` | VARCHAR | Artículo de Wikipedia del taxón; admite nulos |
+
+Una fila por taxón con los atributos de la observación más reciente (`ROW_NUMBER` por
+`created_at_utc`), porque varían entre observaciones descargadas en momentos distintos.
 
 **Tests dbt**:
 - `species_key`: `unique`, `not_null`
 - `taxon_id`: `unique`, `not_null`
 - `scientific_name`: `not_null`
+- `photo_url`: empieza por `https://` (severidad `warn`)
 
 ---
 
