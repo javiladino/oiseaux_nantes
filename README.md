@@ -1,197 +1,167 @@
-# Oiseaux Nantes — Pipeline Analítico de Biodiversidad
+# Oiseaux Nantes — Biodiversity Analytics Pipeline
 
-Pipeline de datos end-to-end que ingesta observaciones de **aves (Aves) en el Gran Nantes**
-desde la plataforma de ciencia ciudadana [iNaturalist](https://www.inaturalist.org), las
-almacena en un Data Lake en **AWS S3**, las transforma con **dbt Core sobre AWS Athena**
-mediante una arquitectura medallón (staging → intermedia → marts) y sirve un modelo dimensional
-en esquema estrella a **Power BI**. **Apache Airflow** orquesta cada día la ingesta y la
-transformación.
+**English** · [Español](README.es.md) · [Français](README.fr.md)
 
-Es un proyecto de referencia de Data Engineering moderno: EL serverless, analytics engineering
-con dbt, calidad de datos con tests automatizados y coste operativo cercano a cero.
+End-to-end ELT pipeline on AWS that incrementally ingests **bird observations in Greater Nantes
+(France)** from the citizen-science platform [iNaturalist](https://www.inaturalist.org), lands
+the raw JSON in an **S3 data lake**, transforms it with **dbt on Athena** through a medallion
+architecture (raw → staging → marts) into a **Parquet star schema**, and serves it to
+**Power BI**. **Apache Airflow** orchestrates ingestion and transformation every day.
 
-## ¿Qué responde?
+It is a reference project for the modern data stack: serverless EL, analytics engineering with
+dbt, automated data-quality tests, infrastructure as code and least-privilege security, at a
+near-zero running cost.
 
-- ¿Qué especies de aves se observan más en Nantes?
-- ¿Cuándo alcanzan su pico las observaciones a lo largo del año (estacionalidad biológica)?
-- ¿Dónde se concentran los avistamientos y quiénes son los observadores más activos?
-- ¿Qué proporción de observaciones tiene grado de investigación (*research grade*)?
+## Highlights
 
-## Arquitectura
+| | |
+|---|---|
+| **In production since** | 2026-10-12 · daily run at 05:00 UTC |
+| **Data** | 18,454 observations · 583 taxa · 1,874 observers (1970 → today) |
+| **Quality** | 77 dbt data tests; a failing test stops every downstream model |
+| **Orchestration** | 13-task Airflow DAG (one `run` + `test` pair per dbt model) |
+| **Cost** | ~20 USD/month (Airflow EC2); Lambda, S3 and Athena cost cents |
+
+## Questions it answers
+
+- Which bird species are observed most around Nantes?
+- When do observations peak during the year (biological seasonality)?
+- Where are sightings concentrated, and who are the most active observers?
+- What share of observations is *research grade* (identification confirmed by the community)?
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    INAT["API iNaturalist"] -->|"incremental · ~1 req/s"| LAMBDA["AWS Lambda<br/>ingestion/"]
-    AF["Apache Airflow (EC2)<br/>DAG diario 05:00 UTC<br/>orchestration/"] -->|"1 · invoca"| LAMBDA
-    AF -->|"2 · run + test por modelo"| DBT
+    INAT["iNaturalist API"] -->|"incremental · ~1 req/s"| LAMBDA["AWS Lambda<br/>ingestion/"]
+    AF["Apache Airflow (EC2)<br/>daily DAG 05:00 UTC<br/>orchestration/"] -->|"1 · invoke"| LAMBDA
+    AF -->|"2 · run + test per model"| DBT
     LAMBDA <-->|"watermark"| SSM[("SSM Parameter Store")]
-    LAMBDA -->|"JSON crudo"| RAW[("S3 raw/<br/>year=/month=")]
-    RAW --> ATHENA["Athena + Glue"]
+    LAMBDA -->|"raw JSON"| RAW[("S3 raw/<br/>year=/month=")]
+    RAW --> ATHENA["Athena + Glue<br/>partition projection"]
     DBT["dbt_birds/<br/>staging → intermediate → marts"] -->|"SQL"| ATHENA
-    ATHENA -->|"Parquet + Snappy"| MARTS[("Esquema estrella")]
-    MARTS -->|"ODBC · modo Import"| PBI["Power BI"]
-    AF -.->|"fallos / retrasos"| SNS["SNS → email"]
-    LAMBDA -.->|"errores / timeouts"| CW["CloudWatch"] -.-> SNS
+    ATHENA -->|"Parquet + Snappy"| MARTS[("Star schema")]
+    MARTS -->|"ODBC · Import mode"| PBI["Power BI"]
+    AF -.->|"failures / delays"| SNS["SNS → email"]
+    LAMBDA -.->|"errors / timeouts"| CW["CloudWatch"] -.-> SNS
 ```
 
-La cartografía completa (flujo de ingesta, DAG de Airflow, linaje de dbt, modelo dimensional y
-CI) está en
+Full system map (ingestion flow, Airflow DAG, dbt lineage, dimensional model, CI) in
 [docs/architecture.md](docs/architecture.md).
 
-### Principios de diseño
+### Design principles
 
-| Principio | En la práctica |
-|-----------|----------------|
-| Separación ELT | Airflow solo orquesta; Lambda solo extrae y carga; dbt transforma; Power BI lee solo `marts` |
-| API ética | Ingesta incremental, ~1 petición/s, cabecera `User-Agent` identificable |
-| Calidad sin fallos | Tests dbt de unicidad, bounding box y `quality_grade`; un fallo bloquea el merge |
-| Mínimo privilegio y coste | IAM sin comodines, Lambda ≤ 3 min, Parquet + Snappy, partition pruning |
-| Idempotencia | Deduplicación por `observation_id`; el watermark solo avanza tras una escritura exitosa |
+| Principle | In practice |
+|-----------|-------------|
+| ELT separation | Airflow only orchestrates; Lambda only extracts and loads; dbt transforms; Power BI reads only `marts` |
+| Ethical API use | Incremental ingestion with a watermark, ~1 request/s, identifiable `User-Agent` |
+| Zero-failure data quality | Uniqueness, bounding-box and `quality_grade` tests; a failing test blocks downstream models |
+| Least privilege and cost | No wildcard IAM ARNs (two documented exceptions), private EC2 reached through Session Manager, Parquet + Snappy |
+| Idempotency | Deduplication on `observation_id`; the watermark only moves after a successful S3 write |
 
-Detalle completo en la [constitución del proyecto](.specify/memory/constitution.md).
+Project rules live in the [constitution](.specify/memory/constitution.md).
 
-## Stack Tecnológico
+## Tech stack
 
-| Capa | Tecnología |
-|------|------------|
-| Ingesta | AWS Lambda (Python 3.11+, `requests`, `boto3`) |
-| Orquestación | Apache Airflow 3.3 + Astronomer Cosmos en EC2 (t3.small); EventBridge desactivado |
-| Infraestructura como código | Terraform (`infra/airflow/`) |
-| Estado incremental | AWS SSM Parameter Store |
-| Data Lake | AWS S3 (raw JSON / procesado Parquet) |
-| Catálogo y cómputo | AWS Glue Data Catalog + AWS Athena |
-| Transformación | dbt-core + dbt-athena, `dbt_utils` |
-| Visualización | Power BI Desktop / Service |
+| Layer | Technology |
+|-------|------------|
+| Ingestion | AWS Lambda (Python, `requests`, `boto3`) |
+| Incremental state | AWS SSM Parameter Store |
+| Data lake | AWS S3 (raw JSON, Parquet marts) |
+| Catalog and compute | AWS Glue Data Catalog + Amazon Athena (partition projection) |
+| Transformation | dbt-core + dbt-athena, `dbt_utils` |
+| Orchestration | Apache Airflow 3.3 + Astronomer Cosmos on EC2 (t3.small, LocalExecutor, PostgreSQL) |
+| Infrastructure as code | Terraform |
+| Alerting | Airflow callbacks + CloudWatch alarms → SNS email |
 | CI | GitHub Actions |
-| Alertas | Callbacks de Airflow + CloudWatch Alarms → SNS |
+| BI | Power BI Desktop (Amazon Athena ODBC 2.x) |
 
-## Modelo de Datos
+## Data model
 
-| Capa | Modelo | Materialización | Función |
-|------|--------|-----------------|---------|
-| Staging | `stg_inaturalist__observations` | view | Casteo, aplanado del JSON, deduplicación |
-| Intermedia | `int_observations__geospatial_enriched` | view | Filtro bbox, franja horaria, bandera *research grade* |
-| Marts | `fct_observations` | table, reconstruida a diario (particionada por año/mes) | Hechos: una fila por observación |
-| Marts | `dim_species` | table | Especie / taxón |
-| Marts | `dim_users` | table | Observador |
-| Marts | `dim_date` | table | Calendario con estación biológica |
+| Layer | Model | Materialization | Role |
+|-------|-------|-----------------|------|
+| Raw | `birds_raw.observations` | external table | iNaturalist JSON as received, partitioned by ingestion year/month |
+| Staging | `stg_inaturalist__observations` | view | Casting, JSON flattening, deduplication |
+| Intermediate | `int_observations__geospatial_enriched` | view | Bounding-box filter, time of day, research-grade flag |
+| Marts | `fct_observations` | table, rebuilt daily, partitioned by year/month | One row per observation |
+| Marts | `dim_species` | table | Taxon, with photo, licence, credit and Wikipedia link |
+| Marts | `dim_users` | table | Observer |
+| Marts | `dim_date` | table | Calendar with biological season |
 
-Columnas, tests y contratos en [data-model.md](specs/001-nantes-birds-pipeline/data-model.md)
-y [contracts/dbt-models.md](specs/001-nantes-birds-pipeline/contracts/dbt-models.md).
+Data-quality decisions made during deployment: observations without an observation date are
+kept in staging (warning test) and excluded from the star schema; dimensions keep the most
+recent attributes of each key; the fact table is rebuilt daily so late uploads are never missed.
+Columns and tests: [data-model.md](specs/001-nantes-birds-pipeline/data-model.md).
 
-## Estructura del Repositorio
+## Repository layout
 
 ```text
 .
-├── ingestion/                 # Lambda: cliente iNaturalist, escritor S3, watermark SSM
-├── tests/                     # pytest + moto (unit) y test contra la API real (integration)
-├── dbt_birds/                 # Proyecto dbt: sources, staging, intermediate, marts, tests
-├── orchestration/             # Airflow: DAG, alertas, configuración, bootstrap, despliegue, systemd
-├── infra/airflow/             # Terraform de la EC2 de Airflow (IAM, security group)
-├── .github/workflows/         # CI: dbt parse e integridad del DAG en cada PR
-├── reports/                   # Informe de Power BI (.pbix)
-├── docs/                      # Arquitectura, infraestructura, Airflow, Power BI, validación
-└── specs/                     # Spec, plan, investigación, contratos y tareas de cada feature
-    ├── 001-nantes-birds-pipeline/
-    └── 002-airflow-orchestration/
+├── ingestion/            # Lambda: iNaturalist client, S3 writer, SSM watermark
+├── dbt_birds/            # dbt project: raw table macro, staging, intermediate, marts, tests
+├── orchestration/        # Airflow: DAG, alerts, config, bootstrap, deploy script, systemd units
+├── infra/airflow/        # Terraform: EC2, IAM role, security group
+├── tests/                # pytest: ingestion (unit, integration) and DAG integrity
+├── .github/workflows/    # CI: dbt parse and DAG integrity on every PR
+├── docs/                 # Architecture, AWS deployment guide, Airflow operations, Power BI, validation
+└── specs/                # Spec, plan, research, contracts and tasks per feature (Spec Kit)
 ```
 
-## Puesta en Marcha
+## Getting started
 
-> Para un despliegue completo desde cero en AWS, seguir el
-> [instructivo de despliegue](docs/despliegue-aws.md) paso a paso.
+Step-by-step deployment from scratch (AWS account, Lambda, initial load, Terraform, Airflow,
+production cut-over): [docs/despliegue-aws.md](docs/despliegue-aws.md).
 
-### Requisitos
-
-- Python 3.11+ (ingesta) y Python 3.12 (Airflow)
-- Terraform ≥ 1.6 y el Session Manager plugin de AWS CLI (orquestación)
-- Cuenta de AWS en `eu-west-3` con un bucket S3, las bases de datos de Glue `birds_raw` y
-  `birds_dbt` y un workgroup de Athena
-- Power BI Desktop con el driver ODBC de Amazon Athena (solo para el informe)
-
-### Tests de la ingesta (sin AWS)
+Local checks, no AWS needed:
 
 ```bash
+# Ingestion unit tests
 pip install -r ingestion/requirements.txt -r tests/requirements-dev.txt
 PYTHONPATH=ingestion pytest tests/unit/ -v
 
-# Test de integración contra la API real de iNaturalist (solo lectura)
-PYTHONPATH=ingestion pytest tests/integration/ -m integration -v
-```
-
-### Despliegue de la ingesta
-
-1. Empaquetar `ingestion/` y desplegarlo como la Lambda `birds-inaturalist-ingestion` con la
-   variable de entorno `BIRDS_S3_BUCKET`.
-2. Configurar el rol IAM, el topic SNS y las alarmas siguiendo
-   [docs/infrastructure.md](docs/infrastructure.md). La regla de EventBridge solo se usa para
-   revertir: la programación diaria la hace Airflow.
-
-### Orquestación con Airflow
-
-```bash
-cd infra/airflow
-terraform init
-terraform apply -var bucket_name=<bucket>   # EC2 + IAM + security group; instala Airflow
-```
-
-Acceso a la UI (por Session Manager, sin puertos abiertos), despliegue de cambios, ejecuciones
-manuales y reconstrucción completa (`full_refresh`) en
-[docs/airflow-operations.md](docs/airflow-operations.md). Tests del DAG:
-
-```bash
-# dbt en un virtualenv aparte; BIRDS_S3_BUCKET es obligatoria para dbt parse
+# Airflow DAG integrity (Python 3.12; dbt in its own virtualenv)
+pip install -r orchestration/requirements.txt \
+  --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.3.2/constraints-3.12.txt
 cd dbt_birds && dbt deps && BIRDS_S3_BUCKET=ci-placeholder \
   dbt parse --profiles-dir ../orchestration/config --target ci && cd ..
 pytest tests/orchestration/ -v
 ```
 
-### Transformaciones dbt
+Power BI connection (read-only IAM user, ODBC driver, star schema, visuals and DAX):
+[docs/powerbi-setup.md](docs/powerbi-setup.md).
 
-```bash
-pip install dbt-athena-community
-cd dbt_birds
-dbt deps
-BIRDS_S3_BUCKET=<bucket> dbt run-operation create_raw_observations_table   # tabla raw (idempotente)
-dbt run --full-refresh                     # primera ejecución
-dbt test
-```
+## Project status
 
-Configurar `s3_staging_dir` y `s3_data_dir` en [dbt_birds/profiles.yml](dbt_birds/profiles.yml).
+| Component | Status |
+|-----------|--------|
+| Lambda ingestion + 14 unit tests | ✅ In production |
+| dbt models + 77 data tests | ✅ In production |
+| Airflow orchestration (Terraform, EC2, DAG, alerts) | ✅ Daily scheduled runs succeeding since 2026-10-13 |
+| CI (GitHub Actions) | ✅ dbt parse + 26 DAG tests · ⏳ `dbt test` against Athena (needs OIDC credentials) |
+| Power BI report | ✅ Star schema, map, seasonality, rankings, top 3 with species photos · ⏳ `.pbix` not yet in the repo |
+| Remaining validation | ⏳ Failure and alert drills, full refresh, IAM simulation, monthly cost review |
 
-### Power BI
+Deployment results and the issues fixed along the way: [docs/validation-results.md](docs/validation-results.md).
 
-Seguir [docs/powerbi-setup.md](docs/powerbi-setup.md): conexión ODBC, relaciones del esquema
-estrella, los tres visuales (mapa, tendencia estacional, ranking) y las medidas DAX.
+## Roadmap
 
-## Estado del Proyecto
+- Time-of-day analysis from the actual observation time (`time_observed_at`) instead of upload time
+- Refresh observations whose quality grade changes after download
+- SCD Type 2 history for `dim_species` with dbt snapshots
+- `dbt test` against Athena in CI (GitHub OIDC role) and automatic deployment to the Airflow host on merge
+- Separate schemas for staging and marts; French common names (`locale=fr`)
 
-| Componente | Estado |
-|------------|--------|
-| Ingesta en Lambda + tests unitarios | ✅ Implementada — 14/14 tests pasan |
-| Modelos y tests dbt | ✅ Implementados |
-| CI de GitHub Actions | ✅ `dbt parse` + integridad del DAG · ⏳ `dbt test` contra Athena pendiente de credenciales (OIDC) |
-| Orquestación con Airflow (código, Terraform, docs) | ✅ Implementada — pendiente de desplegar y validar en AWS |
-| Documentación de infraestructura y Power BI | ✅ Completa |
-| Informe `reports/nantes_birds.pbix` | ⏳ Pendiente (se crea en Power BI Desktop) |
-| Validación end-to-end en AWS real | ⏳ Pendiente — ver [validation-results.md](docs/validation-results.md) |
+## Documentation
 
-## Documentación
+Detailed documentation is written in Spanish.
 
-- [Especificación funcional](specs/001-nantes-birds-pipeline/spec.md)
-- [Plan de implementación](specs/001-nantes-birds-pipeline/plan.md)
-- [Investigación técnica](specs/001-nantes-birds-pipeline/research.md)
-- [Guía de validación (quickstart)](specs/001-nantes-birds-pipeline/quickstart.md)
-- [Contrato de la API de iNaturalist](specs/001-nantes-birds-pipeline/contracts/inaturalist-api.md)
-- [Lista de tareas](specs/001-nantes-birds-pipeline/tasks.md)
-- [Orquestación con Airflow — spec](specs/002-airflow-orchestration/spec.md) ·
-  [plan](specs/002-airflow-orchestration/plan.md) ·
-  [tareas](specs/002-airflow-orchestration/tasks.md)
-- [Instructivo de despliegue en AWS](docs/despliegue-aws.md)
-- [Operación de Airflow](docs/airflow-operations.md)
+- Feature 001, pipeline: [spec](specs/001-nantes-birds-pipeline/spec.md) · [plan](specs/001-nantes-birds-pipeline/plan.md) · [data model](specs/001-nantes-birds-pipeline/data-model.md) · [tasks](specs/001-nantes-birds-pipeline/tasks.md)
+- Feature 002, Airflow orchestration: [spec](specs/002-airflow-orchestration/spec.md) · [plan](specs/002-airflow-orchestration/plan.md) · [tasks](specs/002-airflow-orchestration/tasks.md)
+- [AWS deployment guide](docs/despliegue-aws.md) · [Airflow operations](docs/airflow-operations.md) · [Infrastructure](docs/infrastructure.md) · [Power BI setup](docs/powerbi-setup.md)
 
-## Datos y Licencia
+## Data and licensing
 
-Los datos de observaciones proceden de la API pública de iNaturalist; cada observación conserva
-la licencia elegida por su autor en iNaturalist. El pipeline respeta los límites de uso de la
-API e identifica sus peticiones mediante la cabecera `User-Agent`.
+Observation data comes from the public iNaturalist API; each observation and each species photo
+keeps the licence chosen by its author. The photo credit is stored with every species and must
+be shown next to the image. The pipeline respects the API usage limits and identifies itself
+with a `User-Agent` header.
