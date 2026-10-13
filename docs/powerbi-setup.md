@@ -105,6 +105,10 @@ aws iam create-access-key --user-name oiseaux-powerbi \
 4. **Test** → **OK** en el formulario → **Aceptar** en la ventana principal.
 5. Vuelve a abrir **Configurar** y comprueba que la región sigue guardada.
 
+![Administrador de orígenes de datos ODBC con el DSN AthenaNantesBirds](images/odbc-dsn.png)
+
+*DSN `AthenaNantesBirds` con el driver Amazon Athena ODBC (x64). También funciona como DSN de usuario.*
+
 ---
 
 ## Paso 3: Cargar las 4 tablas de marts
@@ -118,6 +122,10 @@ aws iam create-access-key --user-name oiseaux-powerbi \
 No marques `stg_inaturalist__observations` ni `int_observations__geospatial_enriched`: son
 vistas sobre la tabla raw, a la que este usuario no tiene acceso, y su fallo cancela la carga de
 todas las tablas.
+
+![Editor de Power Query con solo las 4 consultas de marts](images/powerbi-navigator.png)
+
+*Power Query con solo las 4 tablas de marts, sin las vistas de staging e intermedia.*
 
 ---
 
@@ -134,6 +142,10 @@ creada automáticamente (p. ej. por `year`):
 
 Cardinalidad *Varios a uno*, dirección del filtro *Único*, relación activa.
 
+![Vista de modelo de Power BI con el esquema en estrella](images/powerbi-model.png)
+
+*Esquema en estrella: `fct_observations` en el centro y las tres dimensiones con relaciones varios a uno.*
+
 ---
 
 ## Paso 5: Preparar columnas (vista de tabla)
@@ -146,6 +158,10 @@ Cardinalidad *Varios a uno*, dirección del filtro *Único*, relación activa.
 | `fct_observations` | `latitude` / `longitude` | **Categoría de datos → Latitud / Longitud**, tipo número decimal |
 | `dim_species` | `photo_url` | **Categoría de datos → URL de imagen** |
 | `dim_species` | `wikipedia_url` | **Categoría de datos → URL web** |
+
+![Herramientas de columnas con la categoría Dirección URL de la imagen sobre photo_url](images/powerbi-image-url.png)
+
+*Categoría de datos **URL de imagen** sobre `photo_url`.*
 
 ---
 
@@ -180,6 +196,10 @@ Formato de `% grado investigación`: porcentaje con 1 decimal.
 | **Ranking de observadores** | Tabla: `dim_users[login]`, `Total observaciones`; **N superior 10** |
 | **Segmentaciones** | `dim_date[year]` (estilo *Entre*), `biological_season`, `quality_grade` |
 
+![Informe de Power BI completo](images/powerbi-dashboard.png)
+
+*Informe completo con segmentaciones, tarjetas, mapa de densidad, estacionalidad y rankings.*
+
 ### Top 3 con fotos
 
 Requiere las columnas `photo_url`, `photo_attribution`, `photo_license` y `wikipedia_url` de
@@ -192,6 +212,10 @@ Requiere las columnas `photo_url`, `photo_attribution`, `photo_license` y `wikip
 4. Opcional: `wikipedia_url` como columna para abrir la ficha de la especie.
 
 Con el filtro cruzado, el Top 3 y sus fotos cambian al filtrar por estación, año o calidad.
+
+![Tabla de Power BI con la foto de la especie más observada](images/powerbi-top3-photos.png)
+
+*La especie más observada con su foto, cargada desde `photo_url`.*
 
 **Licencias**: cada foto tiene la licencia de su autor; muestra siempre `photo_attribution`.
 Para publicar el informe, filtra `photo_license` no vacío (fotos Creative Commons): un valor
@@ -219,6 +243,10 @@ nulo significa *todos los derechos reservados*.
 | `not authorized to perform: athena:ListDataCatalogs` | Falta la sentencia sin recurso de la política | Paso 1 |
 | `Failed analyzing stored view … glue:GetDatabase … birds_raw` | Se cargaron las vistas `stg_*`/`int_*` | Cargar solo las 4 tablas de marts (Paso 3); eliminar las consultas sobrantes en *Transformar datos* o empezar un archivo nuevo |
 | "Tienes cambios pendientes que no se han aplicado" y falla al aplicar | Quedan consultas de vistas o duplicadas `(2)` en el modelo | Igual que la fila anterior |
+
+![Error 4551 del administrador ODBC por una directiva de control de aplicaciones](images/odbc-error-4551.png)
+
+*Error 4551: Windows bloquea `athenaodbc.dll` (ver la primera fila de la tabla).*
 
 ## Checklist de Verificación
 

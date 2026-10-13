@@ -12,6 +12,10 @@ It is a reference project for the modern data stack: serverless EL, analytics en
 dbt, automated data-quality tests, infrastructure as code and least-privilege security, at a
 near-zero running cost.
 
+![Power BI report: KPIs, density map, seasonality and top species with photo](docs/images/powerbi-dashboard.png)
+
+*Power BI report on the star schema (filtered to 2026, all seasons and quality grades).*
+
 ## Highlights
 
 | | |
@@ -48,6 +52,10 @@ flowchart LR
 
 Full system map (ingestion flow, Airflow DAG, dbt lineage, dimensional model, CI) in
 [docs/architecture.md](docs/architecture.md).
+
+![Airflow DAG: ingestion task followed by the dbt task group](docs/images/airflow-dag-graph.png)
+
+*Airflow 3 DAG `nantes_birds_pipeline`: daily at 05:00 UTC, ingestion then the dbt models.*
 
 ### Design principles
 

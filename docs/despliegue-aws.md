@@ -235,6 +235,10 @@ aws ssm get-parameter --name /birds-pipeline/last_successful_run_date --query Pa
 # Esperado: la fecha y hora de la carga (UTC)
 ```
 
+![Consola de S3 con los archivos JSON de la partición year=2026/month=10](images/s3-raw-partitions.png)
+
+*La carga histórica (1,3 GB) y las ingestas diarias siguientes en la partición del mes.*
+
 Ahora sí, prueba la Lambda (ejecución incremental, debe tardar segundos):
 
 ```bash
@@ -280,6 +284,10 @@ cd "$REPO"
 export INSTANCE_ID=$(terraform -chdir=infra/airflow output -raw instance_id)
 ```
 
+![Salida de terraform apply con 6 recursos creados](images/terraform-apply.png)
+
+*`terraform apply`: 6 recursos creados.*
+
 > El estado de Terraform se guarda en `infra/airflow/terraform.tfstate` (ignorado por git).
 > **No lo borres**: sin él, Terraform no puede actualizar ni destruir la infraestructura.
 
@@ -293,6 +301,10 @@ aws ssm start-session --target "$INSTANCE_ID"
 sudo tail -f /var/log/airflow-bootstrap.log
 # Termina con "== Bootstrap de Airflow completado ==". Ctrl+C y `exit` para salir.
 ```
+
+![Final del log de bootstrap con la tabla raw creada y los servicios systemd habilitados](images/bootstrap-completed.png)
+
+*Final de `/var/log/airflow-bootstrap.log`: tabla raw creada, servicios arrancados y bootstrap completado.*
 
 ---
 
@@ -366,6 +378,10 @@ SELECT COUNT(*) FROM birds_dbt.dim_species;
 SELECT COUNT(*) FROM birds_dbt.dim_users;
 SELECT MIN(date_key), MAX(date_key) FROM birds_dbt.dim_date;
 ```
+
+![Editor de Athena con las tablas de birds_dbt y la consulta de recuento](images/athena-tables.png)
+
+*Athena tras la primera ejecución: 4 tablas y 2 vistas en `birds_dbt`, 18.454 filas sin duplicados.*
 
 **Si una tarea falla:** revisa su log en la UI. Si es un `AccessDenied`, falta un permiso en el
 rol de Airflow: añade la acción mínima concreta a
