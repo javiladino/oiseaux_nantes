@@ -26,8 +26,16 @@ Ejecutados con `PYTHONPATH=ingestion pytest tests/unit/ -v`:
 | 3 | Validación del modelo de staging en dbt | ✅ PASS (2026-10-12) | 14 PASS + 1 WARN (77 observaciones sin `observed_on`, severidad `warn` por decisión de calidad de datos) |
 | 4 | Validación del bbox en la capa intermedia | ✅ PASS (2026-10-12) | 20/20 tests, incluido `assert_observations_within_nantes_bbox`; 18.454 filas |
 | 5 | Integridad completa del esquema estrella en marts | ✅ PASS (2026-10-12) | `fct_observations` 18.454 filas = 18.454 `observation_id` distintos; 583 taxones; 1.874 observadores; tests `relationships` en verde |
-| 6 | Actualización end-to-end en Power BI | PENDIENTE | Requiere el Escenario 5 + Power BI Desktop |
+| 6 | Actualización end-to-end en Power BI | ✅ PASS (2026-10-13) | Conexión ODBC con usuario de solo lectura, modelo estrella, visuales, filtro cruzado y actualización con las columnas de fotos |
 | 7 | Idempotencia ante fallos | PENDIENTE | Requiere completar los Escenarios 1–2 |
+
+![Salida de dbt build del modelo de staging con todos los tests en PASS](images/dbt-build-staging.png)
+
+*Escenario 3: `dbt build` de staging tras corregir el formato de fecha.*
+
+![Resultado de Athena con 18.454 filas y 18.454 observaciones distintas](images/athena-validation.png)
+
+*Escenario 5: 18.454 filas = 18.454 `observation_id` distintos, 583 taxones, 1.874 observadores.*
 
 ---
 
@@ -57,12 +65,20 @@ Despliegue siguiendo `docs/despliegue-aws.md` en la cuenta `437266392155` (`eu-w
 | T016 · Escenario 1 | Infraestructura y servicios | ✅ PASS | `terraform apply`: 6 recursos; security group sin reglas de entrada; bootstrap completado; UI accesible por Session Manager |
 | T021 · Escenario 2 | Ejecución completa del DAG | ✅ PASS | `airflow dags test`: 13/13 tareas en `success` (run `manual__2026-10-12T12:57:10`); duración ~3 min |
 | T022 | Paso a producción | ✅ PASS | Regla `birds-ingestion-daily` en `DISABLED`; DAG `nantes_birds_pipeline` con `is_paused = False` |
-| T028 · Escenarios 3 y 7 | Fallos, reintentos y alertas | PENDIENTE | |
+| T028 · Escenarios 3 y 7 | Fallos, reintentos y alertas | 🟡 PARCIAL | Validado con fallos reales del 2026-10-12: 3 reintentos, `upstream_failed` en los dependientes, email de alerta recibido y plazos incumplidos registrados. Falta el simulacro controlado del quickstart |
 | T031 · Escenario 4 | Reconstrucción completa bajo demanda | PENDIENTE | |
 | T037 · Escenarios 5 y 6 | IAM y programador único | PENDIENTE | |
 | T039 | Coste mensual ≤ 25 USD | PENDIENTE | Revisar en Cost Explorer tras una semana |
 | — | Primera ejecución programada (05:00 UTC) | ✅ PASS (2026-10-13) | `scheduled__2026-10-13T05:00` en `success` sin intervención manual |
 | — | Fotos de especies en `dim_species` (PR #7) | ✅ PASS (2026-10-13) | Tabla raw recreada con `recreate: true`; DAG en `success`; Top 3 con `photo_url`, licencia y atribución |
+
+![Resumen del DAG con las últimas 7 ejecuciones: 3 fallidas y 4 correctas](images/airflow-dag-graph2.png)
+
+*Las 3 ejecuciones fallidas del 12 de octubre (problemas corregidos en el PR #5) y las siguientes en verde, incluida la primera programada.*
+
+![Email de alerta de SNS por el fallo de dbt_medallion.dim_date.test](images/sns-alert-email.png)
+
+*Alerta real recibida por email durante el despliegue (fallo de `dim_date.test`, intento 3).*
 
 ### Problemas encontrados y corregidos durante el despliegue
 

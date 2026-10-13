@@ -32,6 +32,10 @@ aws ssm start-session --target "$(terraform -chdir=infra/airflow output -raw ins
 sudo cat /opt/airflow/simple_auth_manager_passwords.json.generated
 ```
 
+![Vista Graph del DAG nantes_birds_pipeline](images/airflow-dag-graph.png)
+
+*Vista **Graph** del DAG con su programación y la última ejecución.*
+
 ## 2. Desplegar cambios
 
 Tras fusionar en `main` cambios del DAG, de los plugins o de los modelos dbt:
@@ -52,6 +56,10 @@ que aplicar el cambio a mano en la instancia (o volver a ejecutar
 sudo systemctl restart airflow-api-server airflow-scheduler airflow-dag-processor
 ```
 
+![Sesión de Session Manager con deploy.sh, la recreación de la tabla raw y airflow dags test](images/ssm-tunnel.png)
+
+*Sesión de Session Manager: despliegue de una rama, `dags test` y vuelta a `main`.*
+
 ## 3. Ejecuciones manuales
 
 Todas las órdenes `airflow` se ejecutan en la instancia como el usuario `airflow` con su entorno:
@@ -70,6 +78,10 @@ sudo -u airflow bash -c 'set -a; source /etc/airflow/airflow.env; set +a; /opt/a
 La reconstrucción completa solo afecta a los modelos dbt: la ingesta sigue siendo incremental y
 el watermark no se toca. Nunca hay dos ejecuciones a la vez; una nueva espera en cola.
 
+![Vista Calendario con las ejecuciones diarias planificadas a las 05:00 UTC](images/airflow-dag-grid.png)
+
+*Vista **Calendario**: ejecuciones del 12–13 de octubre y las diarias planificadas (07:00 hora de París).*
+
 ## 4. Recuperar una ejecución fallida
 
 1. Leer el email de alerta: indica la tarea, el intento y el error.
@@ -79,6 +91,10 @@ el watermark no se toca. Nunca hay dos ejecuciones a la vez; una nueva espera en
    quedaron en `upstream_failed`.
 
 La ingesta y los modelos son idempotentes: relanzar no genera duplicados.
+
+![Historial de la tarea dbt_medallion.fct_observations.test sin instancias fallidas](images/airflow-task-log-dbt.png)
+
+*Detalle de una tarea (`fct_observations.test`): duración de cada ejecución; sus logs están en *Instancias de Tarea*.*
 
 ## 5. Re-ingesta histórica (excepcional)
 

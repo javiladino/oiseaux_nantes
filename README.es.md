@@ -13,6 +13,10 @@ Es un proyecto de referencia del modern data stack: EL serverless, analytics eng
 dbt, tests automáticos de calidad de datos, infraestructura como código y seguridad de mínimo
 privilegio, con un coste operativo casi nulo.
 
+![Informe de Power BI: KPIs, mapa de densidad, estacionalidad y especie más observada con foto](docs/images/powerbi-dashboard.png)
+
+*Informe de Power BI sobre el modelo estrella (filtrado a 2025 y grado de investigación).*
+
 ## En cifras
 
 | | |
@@ -49,6 +53,10 @@ flowchart LR
 
 La cartografía completa (flujo de ingesta, DAG de Airflow, linaje de dbt, modelo dimensional y
 CI) está en [docs/architecture.md](docs/architecture.md).
+
+![DAG de Airflow: tarea de ingesta seguida del grupo de tareas de dbt](docs/images/airflow-dag-graph.png)
+
+*DAG `nantes_birds_pipeline` en Airflow 3: diario a las 05:00 UTC, ingesta y después los modelos dbt.*
 
 ### Principios de diseño
 
