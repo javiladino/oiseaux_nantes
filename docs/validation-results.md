@@ -104,3 +104,25 @@ Despliegue siguiendo `docs/despliegue-aws.md` en la cuenta `437266392155` (`eu-w
 - El JSON raw ocupa ~70 KB por observación (1,3 GB en total) y staging/intermedia son vistas: cada ejecución diaria lee ~5 GB en Athena (< 1 USD/mes).
 - La CI de dbt solo ejecuta `dbt parse`; `dbt test` contra Athena requiere un rol OIDC para GitHub Actions.
 
+---
+
+## Retirada de la infraestructura (2026-10-16)
+
+Tras validar el pipeline en producción del 12 al 16 de octubre, se retiró toda la infraestructura
+de AWS para no generar costes, siguiendo el paso 11 de `docs/despliegue-aws.md`.
+
+| Recurso | Cómo se retiró | Comprobación |
+|---------|----------------|--------------|
+| EC2 de Airflow, disco, security group, rol e instance profile | `terraform destroy` (6 recursos) | Instancia `terminated`; sin volúmenes ni security group |
+| Regla de EventBridge `birds-ingestion-daily` | `remove-targets` + `delete-rule` | `ResourceNotFoundException` |
+| Lambda, grupo de logs, alarmas y rol de la Lambda | AWS CLI | `ResourceNotFoundException` / `[]` / `NoSuchEntity` |
+| Topic SNS de alertas y watermark en SSM | AWS CLI | `[]` / `ParameterNotFound` |
+| Bases de datos de Glue `birds_raw` y `birds_dbt` | `delete-database` | `[]` |
+| Bucket de S3 (raw, processed, resultados de Athena) | `s3 rm --recursive` + `delete-bucket` | `404 Not Found` |
+| Usuario IAM `oiseaux-powerbi` y su DSN en Windows | AWS CLI y Administrador ODBC | `NoSuchEntity` |
+
+Comprobación final: ningún recurso con la etiqueta `project = oiseaux-nantes` ni con prefijo
+`birds`/`oiseaux` en EC2, Lambda, CloudWatch, SNS, Glue, S3 ni IAM (salvo el usuario
+administrador de la cuenta). El código, la documentación y las capturas permiten volver a
+desplegarlo con `docs/despliegue-aws.md`.
+

@@ -12,6 +12,10 @@ It is a reference project for the modern data stack: serverless EL, analytics en
 dbt, automated data-quality tests, infrastructure as code and least-privilege security, at a
 near-zero running cost.
 
+> **Status:** deployed and validated in production on AWS from 2026-10-12 to 2026-10-16, then
+> decommissioned to avoid ongoing costs. Everything needed to redeploy it is in this repository:
+> [docs/despliegue-aws.md](docs/despliegue-aws.md).
+
 ![Power BI report: KPIs, density map, seasonality and top species with photo](docs/images/powerbi-dashboard.png)
 
 *Power BI report on the star schema (filtered to 2026, all seasons and quality grades).*
@@ -20,11 +24,11 @@ near-zero running cost.
 
 | | |
 |---|---|
-| **In production since** | 2026-10-12 · daily run at 05:00 UTC |
+| **Ran in production** | 2026-10-12 → 2026-10-16 · daily run at 05:00 UTC · since decommissioned |
 | **Data** | 18,454 observations · 583 taxa · 1,874 observers (1970 → today) |
 | **Quality** | 77 dbt data tests; a failing test stops every downstream model |
 | **Orchestration** | 13-task Airflow DAG (one `run` + `test` pair per dbt model) |
-| **Cost** | ~20 USD/month (Airflow EC2); Lambda, S3 and Athena cost cents |
+| **Cost** | ~20 USD/month while deployed (Airflow EC2); Lambda, S3 and Athena cost cents |
 
 ## Questions it answers
 
@@ -142,12 +146,13 @@ Power BI connection (read-only IAM user, ODBC driver, star schema, visuals and D
 
 | Component | Status |
 |-----------|--------|
-| Lambda ingestion + 14 unit tests | ✅ In production |
-| dbt models + 77 data tests | ✅ In production |
-| Airflow orchestration (Terraform, EC2, DAG, alerts) | ✅ Daily scheduled runs succeeding since 2026-10-13 |
+| Lambda ingestion + 14 unit tests | ✅ Validated in production |
+| dbt models + 77 data tests | ✅ Validated in production |
+| Airflow orchestration (Terraform, EC2, DAG, alerts) | ✅ Scheduled daily runs succeeded from 2026-10-13 to 2026-10-16 |
 | CI (GitHub Actions) | ✅ dbt parse + 26 DAG tests · ⏳ `dbt test` against Athena (needs OIDC credentials) |
 | Power BI report | ✅ Star schema, map, seasonality, rankings, top 3 with species photos · ⏳ `.pbix` not yet in the repo |
-| Remaining validation | ⏳ Failure and alert drills, full refresh, IAM simulation, monthly cost review |
+| Remaining validation | ⏸ On redeployment: controlled failure and alert drills, full refresh, IAM simulation, monthly cost review |
+| AWS infrastructure | 🗑 Decommissioned on 2026-10-16 (`terraform destroy` + manual cleanup); running cost now $0 |
 
 Deployment results and the issues fixed along the way: [docs/validation-results.md](docs/validation-results.md).
 
