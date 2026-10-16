@@ -13,6 +13,10 @@ Es un proyecto de referencia del modern data stack: EL serverless, analytics eng
 dbt, tests automáticos de calidad de datos, infraestructura como código y seguridad de mínimo
 privilegio, con un coste operativo casi nulo.
 
+> **Estado:** desplegado y validado en producción en AWS del 2026-10-12 al 2026-10-16; después se
+> retiró la infraestructura para no generar costes. Todo lo necesario para volver a desplegarlo está
+> en este repositorio: [docs/despliegue-aws.md](docs/despliegue-aws.md).
+
 ![Informe de Power BI: KPIs, mapa de densidad, estacionalidad y especie más observada con foto](docs/images/powerbi-dashboard.png)
 
 *Informe de Power BI sobre el modelo estrella (año 2026, todas las estaciones y grados de calidad).*
@@ -21,11 +25,11 @@ privilegio, con un coste operativo casi nulo.
 
 | | |
 |---|---|
-| **En producción desde** | 2026-10-12 · ejecución diaria a las 05:00 UTC |
+| **En producción** | Del 2026-10-12 al 2026-10-16 · ejecución diaria a las 05:00 UTC · infraestructura retirada |
 | **Datos** | 18.454 observaciones · 583 taxones · 1.874 observadores (de 1970 a hoy) |
 | **Calidad** | 77 tests de dbt; un test fallido detiene todos los modelos que dependen de él |
 | **Orquestación** | DAG de Airflow con 13 tareas (una pareja `run` + `test` por modelo dbt) |
-| **Coste** | ~20 USD/mes (EC2 de Airflow); Lambda, S3 y Athena cuestan céntimos |
+| **Coste** | ~20 USD/mes mientras estuvo desplegado (EC2 de Airflow); Lambda, S3 y Athena cuestan céntimos |
 
 ## ¿Qué responde?
 
@@ -144,12 +148,13 @@ Conexión de Power BI (usuario IAM de solo lectura, driver ODBC, modelo estrella
 
 | Componente | Estado |
 |------------|--------|
-| Ingesta en Lambda + 14 tests unitarios | ✅ En producción |
-| Modelos dbt + 77 tests de datos | ✅ En producción |
-| Orquestación con Airflow (Terraform, EC2, DAG, alertas) | ✅ Ejecuciones diarias programadas en verde desde el 2026-10-13 |
+| Ingesta en Lambda + 14 tests unitarios | ✅ Validada en producción |
+| Modelos dbt + 77 tests de datos | ✅ Validados en producción |
+| Orquestación con Airflow (Terraform, EC2, DAG, alertas) | ✅ Ejecuciones diarias programadas en verde del 2026-10-13 al 2026-10-16 |
 | CI (GitHub Actions) | ✅ dbt parse + 26 tests del DAG · ⏳ `dbt test` contra Athena (requiere credenciales OIDC) |
 | Informe de Power BI | ✅ Modelo estrella, mapa, estacionalidad, rankings y Top 3 con fotos de especies · ⏳ `.pbix` aún no está en el repositorio |
-| Validación pendiente | ⏳ Simulacros de fallos y alertas, reconstrucción completa, simulación IAM, revisión del coste mensual |
+| Validación pendiente | ⏸ Al volver a desplegar: simulacros controlados de fallos y alertas, reconstrucción completa, simulación IAM, revisión del coste mensual |
+| Infraestructura en AWS | 🗑 Retirada el 2026-10-16 (`terraform destroy` + limpieza manual); coste actual 0 USD |
 
 Resultados del despliegue y problemas corregidos por el camino:
 [docs/validation-results.md](docs/validation-results.md).

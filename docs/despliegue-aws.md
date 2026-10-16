@@ -429,29 +429,63 @@ Al activarlo, Airflow puede lanzar en ese momento la ejecución del último inte
 **Pausar el coste de la EC2** (el disco sigue costando ~2 USD/mes):
 
 ```bash
-aws ec2 stop-instances --instance-ids "$INSTANCE_ID"     # detener
-aws ec2 start-instances --instance-ids "$INSTANCE_ID"    # reanudar; Airflow arranca solo
+aws ec2 stop-instances --instance-ids "${INSTANCE_ID}"     # detener
+aws ec2 start-instances --instance-ids "${INSTANCE_ID}"    # reanudar; Airflow arranca solo
 ```
 
-**Eliminar la orquestación** (EC2, rol y security group):
+**Eliminar todo** (procedimiento validado el 2026-10-16; borra los datos de forma irreversible).
+Antes de empezar, comprueba la identidad: `aws sts get-caller-identity --query Arn` debe mostrar
+el usuario del proyecto. Las variables `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` de otro
+proyecto tienen prioridad sobre `AWS_PROFILE`; quítalas con `unset` si aparecen en `env`.
 
 ```bash
-terraform -chdir=infra/airflow destroy -var "bucket_name=$BUCKET"
-```
+# 1. Orquestación (EC2, disco, security group, rol): revisar que el plan diga "6 to destroy"
+terraform -chdir=infra/airflow plan -destroy -var "bucket_name=${BUCKET}"
+terraform -chdir=infra/airflow destroy -var "bucket_name=${BUCKET}"
 
-**Eliminar el resto** (borra los datos de forma irreversible):
+# 2. EventBridge
+aws events remove-targets --rule birds-ingestion-daily --ids 1
+aws events delete-rule --name birds-ingestion-daily
 
-```bash
+# 3. Lambda, logs, alarmas y rol de la Lambda
 aws lambda delete-function --function-name birds-inaturalist-ingestion
+aws logs delete-log-group --log-group-name /aws/lambda/birds-inaturalist-ingestion
+aws cloudwatch delete-alarms --alarm-names birds-ingestion-errors birds-ingestion-duration
 aws iam delete-role-policy --role-name birds-ingestion-lambda-role --policy-name birds-ingestion
 aws iam delete-role --role-name birds-ingestion-lambda-role
-aws cloudwatch delete-alarms --alarm-names birds-ingestion-errors birds-ingestion-duration
-aws events remove-targets --rule birds-ingestion-daily --ids 1 && aws events delete-rule --name birds-ingestion-daily
-aws sns delete-topic --topic-arn "$TOPIC_ARN"
+
+# 4. Alertas y watermark
+aws sns delete-topic --topic-arn "${TOPIC_ARN}"
 aws ssm delete-parameter --name /birds-pipeline/last_successful_run_date
-aws glue delete-database --name birds_dbt && aws glue delete-database --name birds_raw
-aws s3 rm "s3://$BUCKET" --recursive && aws s3api delete-bucket --bucket "$BUCKET"
+
+# 5. Catálogo de Glue (solo metadato)
+aws glue delete-database --name birds_dbt
+aws glue delete-database --name birds_raw
+
+# 6. Bucket de S3 (irreversible; --quiet evita miles de líneas en pantalla)
+aws s3 rm "s3://${BUCKET}" --recursive --quiet
+aws s3api delete-bucket --bucket "${BUCKET}"
+
+# 7. Usuario de Power BI (si se creó con docs/powerbi-setup.md)
+for k in $(aws iam list-access-keys --user-name oiseaux-powerbi --query 'AccessKeyMetadata[].AccessKeyId' --output text); do
+  aws iam delete-access-key --user-name oiseaux-powerbi --access-key-id "$k"
+done
+aws iam delete-user-policy --user-name oiseaux-powerbi --policy-name powerbi-readonly-marts
+aws iam delete-user --user-name oiseaux-powerbi
 ```
+
+**Comprobación final** (todo debe devolver `[]`):
+
+```bash
+aws ec2 describe-volumes --filters "Name=tag:project,Values=oiseaux-nantes" --query 'Volumes[].VolumeId'
+aws lambda list-functions --query "Functions[?contains(FunctionName, 'birds')].FunctionName"
+aws sns list-topics --query "Topics[?contains(TopicArn, 'birds')].TopicArn"
+aws glue get-databases --query "DatabaseList[?starts_with(Name, 'birds')].Name"
+aws iam list-roles --query "Roles[?contains(RoleName, 'birds')].RoleName"
+aws s3 ls | grep oiseaux-nantes || echo "[]"
+```
+
+En Windows, borra también el DSN `AthenaNantesBirds` del Administrador ODBC.
 
 ---
 
